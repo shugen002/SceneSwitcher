@@ -35,6 +35,7 @@ if(BUILD_OUT_OF_TREE)
 		src/headers/advanced-scene-switcher.hpp
 		src/headers/switcher-data-structs.hpp
 		src/headers/utility.hpp
+		src/headers/helper-filter.hpp
 		)
 
 	set(advanced-scene-switcher_SOURCES
@@ -46,6 +47,7 @@ if(BUILD_OUT_OF_TREE)
 		src/priority.cpp
 		src/executable-switch.cpp
 		src/idle-switch.cpp
+		src/image-switch.cpp
 		src/scene-round-trip.cpp
 		src/file-switch.cpp
 		src/window-title-switch.cpp
@@ -55,6 +57,7 @@ if(BUILD_OUT_OF_TREE)
 		src/pause-switch.cpp
 		src/random.cpp
 		src/time-switch.cpp
+		src/helper-filter.cpp
 		)
 
 	set(advanced-scene-switcher_UI
@@ -167,6 +170,7 @@ else ()
 		src/headers/advanced-scene-switcher.hpp
 		src/headers/switcher-data-structs.hpp
 		src/headers/utility.hpp
+		src/headers/helper-filter.hpp
 		)
 
 	set(advanced-scene-switcher_SOURCES
@@ -178,6 +182,7 @@ else ()
 		src/priority.cpp
 		src/executable-switch.cpp
 		src/idle-switch.cpp
+		src/image-switch.cpp
 		src/scene-round-trip.cpp
 		src/file-switch.cpp
 		src/window-title-switch.cpp
@@ -187,6 +192,7 @@ else ()
 		src/pause-switch.cpp
 		src/random.cpp
 		src/time-switch.cpp
+		src/helper-filter.cpp
 		)
 
 	set(advanced-scene-switcher_UI

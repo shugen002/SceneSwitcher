@@ -50,6 +50,7 @@ public:
 	void UpdateIdleDataScene(const QString &name);
 
 	void loadUI();
+	void setTabOrder();
 
 public slots:
 	void on_switches_currentRowChanged(int idx);
@@ -64,6 +65,7 @@ public slots:
 	void on_noMatchSwitchScene_currentTextChanged(const QString &text);
 	void on_checkInterval_valueChanged(int value);
 	void on_toggleStartButton_clicked();
+	void on_tabMoved(int from, int to);
 
 	void on_screenRegions_currentRowChanged(int idx);
 	void on_screenRegionAdd_clicked();
@@ -149,6 +151,15 @@ public slots:
 	void on_timeSwitches_currentRowChanged(int idx);
 	void on_timeAdd_clicked();
 	void on_timeRemove_clicked();
+
+	void on_imgCmpSwitches_currentRowChanged(int idx);
+	int imgCmpFindByData(const QString &imgCmpStr);
+	void on_imgCmpBrowse_clicked();
+	void on_imgCmpAdd_clicked();
+	void on_imgCmpRemove_clicked();
+	void on_imgCmpUp_clicked();
+	void on_imgCmpDown_clicked();
+	void on_imgCmpMatchType_currentIndexChanged(int idx);
 
 	void on_priorityUp_clicked();
 	void on_priorityDown_clicked();

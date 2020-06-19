@@ -8,6 +8,8 @@
 #include <fstream>
 #include <QDateTime>
 #include <QThread>
+
+#include "helper-filter.hpp"
 #include "utility.hpp"
 
 #define DEFAULT_INTERVAL 300
@@ -24,6 +26,7 @@
 #define WINDOW_TITLE_FUNC 5
 #define MEDIA_FUNC 6
 #define TIME_FUNC 7
+#define IMG_FUNC 8
 
 #define DEFAULT_PRIORITY_0 READ_FILE_FUNC
 #define DEFAULT_PRIORITY_1 ROUND_TRIP_FUNC
@@ -33,6 +36,7 @@
 #define DEFAULT_PRIORITY_5 WINDOW_TITLE_FUNC
 #define DEFAULT_PRIORITY_6 MEDIA_FUNC
 #define DEFAULT_PRIORITY_7 TIME_FUNC
+#define DEFAULT_PRIORITY_8 IMG_FUNC
 
 /********************************************************************************
  * Data structs for each scene switching method
@@ -210,7 +214,7 @@ struct MediaSwitch {
 	OBSWeakSource source;
 	OBSWeakSource transition;
 	obs_media_state state;
-	uint64_t time;
+	int64_t time;
 	time_restriction restriction;
 	bool matched;
 	bool usePreviousScene;
@@ -252,6 +256,90 @@ struct TimeSwitch {
 	}
 };
 
+struct ImgCmpSwitch {
+	OBSWeakSource scene;
+	OBSWeakSource transition;
+	OBSWeakSource source;
+	imgCmpMatchType matchType;
+	int similarity;
+	std::string filePath;
+	gs_texture *tex = nullptr; //gs_texture_create_from_file(path.c_str()
+	bool usePreviousScene;
+	std::string imgCmpSwitchStr;
+
+	inline ImgCmpSwitch(OBSWeakSource scene_, OBSWeakSource transition_,
+			    OBSWeakSource source_, imgCmpMatchType matchType_,
+			    int similarity_, std::string filePath_,
+			    bool usePreviousScene_,
+			    std::string imgCmpSwitchStr_)
+		: scene(scene_),
+		  transition(transition_),
+		  source(source_),
+		  matchType(matchType_),
+		  similarity(similarity_),
+		  filePath(filePath_),
+		  usePreviousScene(usePreviousScene_),
+		  imgCmpSwitchStr(imgCmpSwitchStr_)
+	{
+		obs_enter_graphics();
+		tex = gs_texture_create_from_file(filePath_.c_str());
+		obs_leave_graphics();
+	}
+
+	ImgCmpSwitch(const ImgCmpSwitch &other)
+		: scene(other.scene),
+		  transition(other.transition),
+		  source(other.source),
+		  matchType(other.matchType),
+		  similarity(other.similarity),
+		  filePath(other.filePath),
+		  usePreviousScene(other.usePreviousScene),
+		  imgCmpSwitchStr(other.imgCmpSwitchStr)
+	{
+		tex = gs_texture_create_from_file(other.filePath.c_str());
+	}
+
+	ImgCmpSwitch(ImgCmpSwitch &&other)
+		: scene(other.scene),
+		  transition(other.transition),
+		  source(other.source),
+		  matchType(other.matchType),
+		  similarity(other.similarity),
+		  filePath(other.filePath),
+		  usePreviousScene(other.usePreviousScene),
+		  imgCmpSwitchStr(other.imgCmpSwitchStr),
+		  tex(other.tex)
+	{
+		other.tex = nullptr;
+	}
+
+	inline ~ImgCmpSwitch()
+	{
+		obs_enter_graphics();
+		gs_texture_destroy(tex);
+		tex = nullptr;
+		obs_leave_graphics();
+	}
+
+	ImgCmpSwitch &operator=(const ImgCmpSwitch &other)
+	{
+		return *this = ImgCmpSwitch (other);
+	}
+
+	ImgCmpSwitch &operator=(ImgCmpSwitch &&other) noexcept
+	{
+		if (this == &other) {
+			return *this;
+		}
+		gs_texture_destroy(tex);
+		tex = other.tex;
+		other.tex = nullptr;
+		return *this;
+	}
+};
+
+
+
 typedef enum { NO_SWITCH = 0, SWITCH = 1, RANDOM_SWITCH = 2 } NoMatch;
 
 class SwitcherThread;
@@ -264,6 +352,7 @@ struct SwitcherData {
 
 	std::condition_variable cv;
 	std::mutex m;
+	std::mutex helperFilterM;
 	bool transitionActive = false;
 	bool waitForTransition = false;
 	std::condition_variable transitionCv;
@@ -313,10 +402,14 @@ struct SwitcherData {
 
 	std::vector<TimeSwitch> timeSwitches;
 
+	std::vector<ImgCmpSwitch> imgCmpSwitches;
+	std::map<OBSWeakSource, frameData *> filterSourceToFrames;
+	std::map<OBSWeakSource, OBSWeakSource> weakSoruceToFilterSource;
+
 	std::vector<int> functionNamesByPriority = std::vector<int>{
 		DEFAULT_PRIORITY_0, DEFAULT_PRIORITY_1, DEFAULT_PRIORITY_2,
 		DEFAULT_PRIORITY_3, DEFAULT_PRIORITY_4, DEFAULT_PRIORITY_5,
-		DEFAULT_PRIORITY_6, DEFAULT_PRIORITY_7};
+		DEFAULT_PRIORITY_6, DEFAULT_PRIORITY_7, DEFAULT_PRIORITY_8};
 
 	struct ThreadPrio {
 		std::string name;
@@ -344,6 +437,8 @@ struct SwitcherData {
 	};
 
 	uint32_t threadPriority = QThread::NormalPriority;
+
+	std::vector<int> tabOrder;
 
 	void Thread();
 	void Start();
@@ -376,6 +471,10 @@ struct SwitcherData {
 			      OBSWeakSource &transition);
 	void checkTimeSwitch(bool &match, OBSWeakSource &scene,
 			     OBSWeakSource &transition);
+	void checkImageSwitch(bool &match, OBSWeakSource &scene,
+			      OBSWeakSource &transition);
+
+	__int64 calcImageHash(obs_source_frame *src);
 
 	void saveWindowTitleSwitches(obs_data_t *obj);
 	void saveScreenRegionSwitches(obs_data_t *obj);
@@ -388,6 +487,7 @@ struct SwitcherData {
 	void saveFileSwitches(obs_data_t *obj);
 	void saveMediaSwitches(obs_data_t *obj);
 	void saveTimeSwitches(obs_data_t *obj);
+	void saveImgCmpSettings(obs_data_t *obj);
 	void saveGeneralSettings(obs_data_t *obj);
 
 	void loadWindowTitleSwitches(obs_data_t *obj);
@@ -401,7 +501,10 @@ struct SwitcherData {
 	void loadFileSwitches(obs_data_t *obj);
 	void loadMediaSwitches(obs_data_t *obj);
 	void loadTimeSwitches(obs_data_t *obj);
+	void loadImgCmpSettings(obs_data_t *obj);
 	void loadGeneralSettings(obs_data_t *obj);
+
+	void removeUnusedHelperFilters();
 
 	void Prune()
 	{
@@ -511,11 +614,22 @@ struct SwitcherData {
 				mediaSwitches.erase(mediaSwitches.begin() +
 						    i--);
 		}
+
+		for (size_t i = 0; i < imgCmpSwitches.size(); i++) {
+			ImgCmpSwitch &s = imgCmpSwitches[i];
+			if ((!s.usePreviousScene &&
+			     !WeakSourceValid(s.scene)) ||
+			    !WeakSourceValid(s.source) ||
+			    !WeakSourceValid(s.transition))
+				imgCmpSwitches.erase(imgCmpSwitches.begin() +
+						     i--);
+		}
 	}
 	inline ~SwitcherData() { Stop(); }
 };
 
 extern SwitcherData *switcher;
+
 class SwitcherThread : public QThread {
 public:
 	explicit SwitcherThread(){};

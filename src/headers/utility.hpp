@@ -179,6 +179,29 @@ static inline QString MakeTimeSwitchName(const QString &scene,
 	return switchName;
 }
 
+typedef enum {
+	IMG_CMP_EXACT_MATCH,
+	IMG_CMP_SIMILAR,
+} imgCmpMatchType;
+
+static inline QString MakeImgCmpSwitchName(const QString &source,
+					   imgCmpMatchType matchType,
+					   int similarity, const QString &file,
+					   const QString &scene,
+					   const QString &transition)
+{
+	QString switchName = QStringLiteral("If output of ") + source;
+	if (matchType == IMG_CMP_EXACT_MATCH)
+		switchName += QStringLiteral(" exactly matches ");
+	else if (matchType == IMG_CMP_SIMILAR)
+		switchName += QStringLiteral(" is similar (") +
+			      QString::number(similarity) +
+			      QStringLiteral(") to ");
+	switchName += file + QStringLiteral(" switch to ") + scene +
+		      QStringLiteral(" using ") + transition;
+	return switchName;
+}
+
 static inline std::string GetWeakSourceName(obs_weak_source_t *weak_source)
 {
 	std::string name;

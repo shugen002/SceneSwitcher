@@ -189,6 +189,7 @@ void SceneSwitcher::on_exportSettings_clicked()
 		switcher->saveFileSwitches(obj);
 		switcher->saveMediaSwitches(obj);
 		switcher->saveTimeSwitches(obj);
+		switcher->saveImgCmpSettings(obj);
 		switcher->saveGeneralSettings(obj);
 
 		obs_data_save_json(obj, file.fileName().toUtf8().constData());
@@ -234,6 +235,7 @@ void SceneSwitcher::on_importSettings_clicked()
 		switcher->loadFileSwitches(obj);
 		switcher->loadMediaSwitches(obj);
 		switcher->loadTimeSwitches(obj);
+		switcher->loadImgCmpSettings(obj);
 		switcher->loadGeneralSettings(obj);
 
 		obs_data_release(obj);
@@ -244,6 +246,86 @@ void SceneSwitcher::on_importSettings_clicked()
 		Msgbox.exec();
 		close();
 	}
+}
+
+int findTabIndex(QTabBar *bar, int pos)
+{
+	int at = -1;
+
+	QString tabName = "";
+	switch (pos) {
+	case 0:
+		tabName = "General";
+		break;
+	case 1:
+		tabName = "Transition";
+		break;
+	case 2:
+		tabName = "Pause";
+		break;
+	case 3:
+		tabName = "Title";
+		break;
+	case 4:
+		tabName = "Executable";
+		break;
+	case 5:
+		tabName = "Region";
+		break;
+	case 6:
+		tabName = "Media";
+		break;
+	case 7:
+		tabName = "File";
+		break;
+	case 8:
+		tabName = "Random";
+		break;
+	case 9:
+		tabName = "Time";
+		break;
+	case 10:
+		tabName = "Idle";
+		break;
+	case 11:
+		tabName = "Sequence";
+		break;
+	case 12:
+		tabName = "Image";
+		break;
+	}
+
+	for (int i = 0; i < bar->count(); ++i) {
+		if (bar->tabText(i).compare(tabName) == 0) {
+			at = i;
+			break;
+		}
+	}
+	if (at == -1)
+		blog(LOG_INFO, "Advanced Scene Switcher failed to find tab %s",
+		     tabName.toUtf8().constData());
+
+	return at;
+}
+
+void SceneSwitcher::setTabOrder()
+{
+	QTabBar *bar = ui->tabWidget->tabBar();
+	for (int i = 0; i < bar->count(); ++i) {
+		int curPos = findTabIndex(bar, switcher->tabOrder[i]);
+
+		if (i != curPos && curPos != -1)
+			bar->moveTab(curPos, i);
+	}
+
+	connect(bar, &QTabBar::tabMoved, this, &SceneSwitcher::on_tabMoved);
+}
+
+void SceneSwitcher::on_tabMoved(int from, int to)
+{
+	if (loading)
+		return;
+	std::swap(switcher->tabOrder[from], switcher->tabOrder[to]);
 }
 
 void SwitcherData::saveGeneralSettings(obs_data_t *obj)
@@ -283,8 +365,24 @@ void SwitcherData::saveGeneralSettings(obs_data_t *obj)
 			 switcher->functionNamesByPriority[6]);
 	obs_data_set_int(obj, "priority7",
 			 switcher->functionNamesByPriority[7]);
+	obs_data_set_int(obj, "priority8",
+			 switcher->functionNamesByPriority[8]);
 
 	obs_data_set_int(obj, "threadPriority", switcher->threadPriority);
+
+	obs_data_set_int(obj, "generalTabPos", switcher->tabOrder[0]);
+	obs_data_set_int(obj, "transitionTabPos", switcher->tabOrder[1]);
+	obs_data_set_int(obj, "pauseTabPos", switcher->tabOrder[2]);
+	obs_data_set_int(obj, "titleTabPos", switcher->tabOrder[3]);
+	obs_data_set_int(obj, "exeTabPos", switcher->tabOrder[4]);
+	obs_data_set_int(obj, "regionTabPos", switcher->tabOrder[5]);
+	obs_data_set_int(obj, "mediaTabPos", switcher->tabOrder[6]);
+	obs_data_set_int(obj, "fileTabPos", switcher->tabOrder[7]);
+	obs_data_set_int(obj, "randomTabPos", switcher->tabOrder[8]);
+	obs_data_set_int(obj, "timeTabPos", switcher->tabOrder[9]);
+	obs_data_set_int(obj, "idleTabPos", switcher->tabOrder[10]);
+	obs_data_set_int(obj, "sequenceTabPos", switcher->tabOrder[11]);
+	obs_data_set_int(obj, "imageTabPos", switcher->tabOrder[12]);
 }
 
 void SwitcherData::loadGeneralSettings(obs_data_t *obj)
@@ -317,6 +415,7 @@ void SwitcherData::loadGeneralSettings(obs_data_t *obj)
 	obs_data_set_default_int(obj, "priority5", DEFAULT_PRIORITY_5);
 	obs_data_set_default_int(obj, "priority6", DEFAULT_PRIORITY_6);
 	obs_data_set_default_int(obj, "priority7", DEFAULT_PRIORITY_7);
+	obs_data_set_default_int(obj, "priority8", DEFAULT_PRIORITY_8);
 
 	switcher->functionNamesByPriority[0] =
 		(obs_data_get_int(obj, "priority0"));
@@ -332,8 +431,10 @@ void SwitcherData::loadGeneralSettings(obs_data_t *obj)
 		(obs_data_get_int(obj, "priority5"));
 	switcher->functionNamesByPriority[6] =
 		(obs_data_get_int(obj, "priority6"));
-	switcher->functionNamesByPriority[6] =
+	switcher->functionNamesByPriority[7] =
 		(obs_data_get_int(obj, "priority7"));
+	switcher->functionNamesByPriority[8] =
+		(obs_data_get_int(obj, "priority8"));
 	if (!switcher->prioFuncsValid()) {
 		switcher->functionNamesByPriority[0] = (DEFAULT_PRIORITY_0);
 		switcher->functionNamesByPriority[1] = (DEFAULT_PRIORITY_1);
@@ -343,9 +444,51 @@ void SwitcherData::loadGeneralSettings(obs_data_t *obj)
 		switcher->functionNamesByPriority[5] = (DEFAULT_PRIORITY_5);
 		switcher->functionNamesByPriority[6] = (DEFAULT_PRIORITY_6);
 		switcher->functionNamesByPriority[7] = (DEFAULT_PRIORITY_7);
+		switcher->functionNamesByPriority[8] = (DEFAULT_PRIORITY_8);
 	}
 
 	obs_data_set_default_int(obj, "threadPriority",
 				 QThread::NormalPriority);
 	switcher->threadPriority = obs_data_get_int(obj, "threadPriority");
+
+	obs_data_set_default_int(obj, "generalTabPos", 0);
+	obs_data_set_default_int(obj, "transitionTabPos", 1);
+	obs_data_set_default_int(obj, "pauseTabPos", 2);
+	obs_data_set_default_int(obj, "titleTabPos", 3);
+	obs_data_set_default_int(obj, "exeTabPos", 4);
+	obs_data_set_default_int(obj, "regionTabPos", 5);
+	obs_data_set_default_int(obj, "mediaTabPos", 6);
+	obs_data_set_default_int(obj, "fileTabPos", 7);
+	obs_data_set_default_int(obj, "randomTabPos", 8);
+	obs_data_set_default_int(obj, "timeTabPos", 9);
+	obs_data_set_default_int(obj, "idleTabPos", 10);
+	obs_data_set_default_int(obj, "sequenceTabPos", 11);
+	obs_data_set_default_int(obj, "imageTabPos", 12);
+
+	switcher->tabOrder.emplace_back(
+		(int)(obs_data_get_int(obj, "generalTabPos")));
+	switcher->tabOrder.emplace_back(
+		(int)(obs_data_get_int(obj, "transitionTabPos")));
+	switcher->tabOrder.emplace_back(
+		(int)(obs_data_get_int(obj, "pauseTabPos")));
+	switcher->tabOrder.emplace_back(
+		(int)(obs_data_get_int(obj, "titleTabPos")));
+	switcher->tabOrder.emplace_back(
+		(int)(obs_data_get_int(obj, "exeTabPos")));
+	switcher->tabOrder.emplace_back(
+		(int)(obs_data_get_int(obj, "regionTabPos")));
+	switcher->tabOrder.emplace_back(
+		(int)(obs_data_get_int(obj, "mediaTabPos")));
+	switcher->tabOrder.emplace_back(
+		(int)(obs_data_get_int(obj, "fileTabPos")));
+	switcher->tabOrder.emplace_back(
+		(int)(obs_data_get_int(obj, "randomTabPos")));
+	switcher->tabOrder.emplace_back(
+		(int)(obs_data_get_int(obj, "timeTabPos")));
+	switcher->tabOrder.emplace_back(
+		(int)(obs_data_get_int(obj, "idleTabPos")));
+	switcher->tabOrder.emplace_back(
+		(int)(obs_data_get_int(obj, "sequenceTabPos")));
+	switcher->tabOrder.emplace_back(
+		(int)(obs_data_get_int(obj, "imageTabPos")));
 }

@@ -42,6 +42,10 @@ SceneSwitcher::SceneSwitcher(QWidget *parent)
 
 void SceneSwitcher::loadUI()
 {
+#if __APPLE__
+	setMinimumHeight(700);
+#endif
+	setTabOrder();
 
 	BPtr<char *> scenes = obs_frontend_get_scene_names();
 	char **temp = scenes;
@@ -63,10 +67,13 @@ void SceneSwitcher::loadUI()
 		ui->fileScenes->addItem(name);
 		ui->mediaScenes->addItem(name);
 		ui->timeScenes->addItem(name);
+		ui->imgCmpScenes->addItem(name);
+		ui->imgCmpSources->addItem(name);
 		temp++;
 	}
 
-	auto sourceEnum = [](void *data, obs_source_t *source) -> bool /* -- */
+	auto sourceEnumMedia = [](void *data,
+				  obs_source_t *source) -> bool /* -- */
 	{
 		QComboBox *combo = reinterpret_cast<QComboBox *>(data);
 		if (strcmp(obs_source_get_id(source), "ffmpeg_source") == 0) {
@@ -76,7 +83,7 @@ void SceneSwitcher::loadUI()
 		return true;
 	};
 
-	obs_enum_sources(sourceEnum, ui->mediaSources);
+	obs_enum_sources(sourceEnumMedia, ui->mediaSources);
 
 	ui->mediaStates->addItem("None");
 	ui->mediaStates->addItem("Playing");
@@ -93,10 +100,28 @@ void SceneSwitcher::loadUI()
 	ui->mediaTimeRestrictions->addItem("Time remaining shorter");
 	ui->mediaTimeRestrictions->addItem("Time remaining longer");
 
+	auto sourceEnumVideoOut = [](void *data, obs_source_t *source) -> bool {
+		QComboBox *combo = reinterpret_cast<QComboBox *>(data);
+		uint32_t flags = obs_source_get_output_flags(source);
+
+		if ((flags & OBS_SOURCE_VIDEO) != 0) {
+			const char *name = obs_source_get_name(source);
+			combo->addItem(name);
+		}
+
+		return true;
+	};
+
+	obs_enum_sources(sourceEnumVideoOut, ui->imgCmpSources);
+
+	ui->imgCmpMatchType->addItem("exactly matches");
+	ui->imgCmpMatchType->addItem("is similar to");
+
 	ui->sceneRoundTripScenes2->addItem(PREVIOUS_SCENE_NAME);
 	ui->idleScenes->addItem(PREVIOUS_SCENE_NAME);
 	ui->mediaScenes->addItem(PREVIOUS_SCENE_NAME);
 	ui->timeScenes->addItem(PREVIOUS_SCENE_NAME);
+	ui->imgCmpScenes->addItem(PREVIOUS_SCENE_NAME);
 
 	obs_frontend_source_list *transitions = new obs_frontend_source_list();
 	obs_frontend_get_transitions(transitions);
@@ -115,6 +140,7 @@ void SceneSwitcher::loadUI()
 		ui->fileTransitions->addItem(name);
 		ui->mediaTransitions->addItem(name);
 		ui->timeTransitions->addItem(name);
+		ui->imgCmpTransitions->addItem(name);
 	}
 
 	obs_frontend_source_list_free(transitions);
@@ -338,6 +364,22 @@ void SceneSwitcher::loadUI()
 		item->setData(Qt::UserRole, listText);
 	}
 
+	for (auto &s : switcher->imgCmpSwitches) {
+		std::string sceneName = (s.usePreviousScene)
+						? PREVIOUS_SCENE_NAME
+						: GetWeakSourceName(s.scene);
+		std::string transitionName = GetWeakSourceName(s.transition);
+		std::string sourceName = GetWeakSourceName(s.source);
+
+		QString listText = MakeImgCmpSwitchName(
+			sourceName.c_str(), s.matchType, s.similarity,
+			s.filePath.c_str(), sceneName.c_str(),
+			transitionName.c_str());
+		QListWidgetItem *item =
+			new QListWidgetItem(listText, ui->imgCmpSwitches);
+		item->setData(Qt::UserRole, listText);
+	}
+
 	ui->idleCheckBox->setChecked(switcher->idleData.idleEnable);
 	ui->idleScenes->setCurrentText(
 		switcher->idleData.usePreviousScene
@@ -411,6 +453,9 @@ void SceneSwitcher::loadUI()
 		case TIME_FUNC:
 			s = "Time";
 			break;
+		case IMG_FUNC:
+			s = "Image Comparision";
+			break;
 		}
 		QString text(s.c_str());
 		QListWidgetItem *item =
@@ -435,6 +480,7 @@ void SceneSwitcher::loadUI()
 /********************************************************************************
  * Saving and loading
  ********************************************************************************/
+
 static void SaveSceneSwitcher(obs_data_t *save_data, bool saving, void *)
 {
 	if (saving) {
@@ -455,6 +501,7 @@ static void SaveSceneSwitcher(obs_data_t *save_data, bool saving, void *)
 		switcher->saveFileSwitches(obj);
 		switcher->saveMediaSwitches(obj);
 		switcher->saveTimeSwitches(obj);
+		switcher->saveImgCmpSettings(obj);
 		switcher->saveGeneralSettings(obj);
 
 		obs_data_set_obj(save_data, "advanced-scene-switcher", obj);
@@ -480,9 +527,12 @@ static void SaveSceneSwitcher(obs_data_t *save_data, bool saving, void *)
 		switcher->loadFileSwitches(obj);
 		switcher->loadMediaSwitches(obj);
 		switcher->loadTimeSwitches(obj);
+		switcher->loadImgCmpSettings(obj);
 		switcher->loadGeneralSettings(obj);
 
 		obs_data_release(obj);
+
+		switcher->removeUnusedHelperFilters();
 
 		switcher->m.unlock();
 
@@ -576,7 +626,13 @@ void SwitcherData::Thread()
 			case TIME_FUNC:
 				checkTimeSwitch(match, scene, transition);
 				break;
+			case IMG_FUNC:
+				checkImageSwitch(match, scene, transition);
+				break;
 			}
+
+			//REMOVE ME
+			checkImageSwitch(match, scene, transition);
 
 			if (switcher->stop) {
 				goto endLoop;
@@ -677,32 +733,33 @@ extern "C" void FreeSceneSwitcher()
 	switcher = nullptr;
 }
 
+void handleSceneChange(SwitcherData *s)
+{
+	std::lock_guard<std::mutex> lock(s->m);
+	//stop waiting if scene was manually changed
+	if (s->sceneChangedDuringWait())
+		s->cv.notify_one();
+
+	//set previous scene
+	obs_source_t *source = obs_frontend_get_current_scene();
+	obs_weak_source_t *ws = obs_source_get_weak_source(source);
+	obs_source_release(source);
+	obs_weak_source_release(ws);
+	if (source && s->PreviousScene2 != ws) {
+		s->previousScene = s->PreviousScene2;
+		s->PreviousScene2 = ws;
+	}
+}
+
 static void OBSEvent(enum obs_frontend_event event, void *switcher)
 {
 	switch (event) {
 	case OBS_FRONTEND_EVENT_EXIT:
 		FreeSceneSwitcher();
 		break;
-
-	case OBS_FRONTEND_EVENT_SCENE_CHANGED: {
-		SwitcherData *s = (SwitcherData *)switcher;
-		std::lock_guard<std::mutex> lock(s->m);
-		//stop waiting if scene was manually changed
-		if (s->sceneChangedDuringWait())
-			s->cv.notify_one();
-
-		//set previous scene
-		obs_source_t *source = obs_frontend_get_current_scene();
-		obs_weak_source_t *ws = obs_source_get_weak_source(source);
-		obs_source_release(source);
-		obs_weak_source_release(ws);
-		if (source && s->PreviousScene2 != ws) {
-			s->previousScene = s->PreviousScene2;
-			s->PreviousScene2 = ws;
-		}
-
+	case OBS_FRONTEND_EVENT_SCENE_CHANGED:
+		handleSceneChange((SwitcherData*) switcher);
 		break;
-	}
 	default:
 		break;
 	}
@@ -722,7 +779,6 @@ extern "C" void InitSceneSwitcher()
 		SceneSwitcher ss(window);
 		ss.exec();
 	};
-
 	obs_frontend_add_save_callback(SaveSceneSwitcher, nullptr);
 	obs_frontend_add_event_callback(OBSEvent, switcher);
 
