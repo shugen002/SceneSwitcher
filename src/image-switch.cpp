@@ -16,10 +16,6 @@
 #define SCALE_TARGET_WIDTH 9
 #define SCALE_TARGET_HEIGHT 8
 
-//OBS SORUCE FRAME APPROACH DOES NOT WORK AS OBS_SOURCE FRAME ONLY USED IN ASYNC STUFF (eg Media source)
-// -> so switch to using textures
-// -> use image-file helpers to load texture from file
-
 void SceneSwitcher::on_imgCmpMatchType_currentIndexChanged(int idx)
 {
 	if (idx == -1)
