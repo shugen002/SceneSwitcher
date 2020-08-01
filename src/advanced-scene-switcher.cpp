@@ -87,6 +87,7 @@ void SceneSwitcher::loadUI()
 	setupMediaTab();
 	setupFileTab();
 	setupTimeTab();
+	setupImageTab();
 
 	setTabOrder();
 

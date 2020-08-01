@@ -398,17 +398,21 @@ __int64 SwitcherData::calcImageHash(obs_source_frame *src)
 
 void matchesExactly(gs_texture *frame1, gs_texture *frame2, bool &match)
 {
+	if (!frame1)
+		return;
+	if (!frame2)
+		return;
+
 	obs_enter_graphics();
 
 	uint8_t *ptr1, *ptr2;
 	uint32_t linesize1, linesize2;
-	gs_texture_map(frame1, &ptr1, &linesize1);
-	gs_texture_map(frame2, &ptr2, &linesize2);
-	//params seem incorrect
-	gs_texture_unmap(frame1);
-	gs_texture_unmap(frame1);
+	if (gs_texture_map(frame1, &ptr1, &linesize1) && gs_texture_map(frame2, &ptr2, &linesize2)) {
+		;
+		gs_texture_unmap(frame1);
+		gs_texture_unmap(frame1);
+	}
 	obs_leave_graphics();
-	//gs_texture_get_obj
 }
 
 void isSimilar(gs_texture *frame1, gs_texture *frame2, int &similarity,
