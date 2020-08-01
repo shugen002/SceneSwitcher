@@ -191,6 +191,7 @@ void SceneSwitcher::on_exportSettings_clicked()
 	switcher->saveFileSwitches(obj);
 	switcher->saveMediaSwitches(obj);
 	switcher->saveTimeSwitches(obj);
+	switcher->saveImgCmpSettings(obj);
 	switcher->saveGeneralSettings(obj);
 
 	obs_data_save_json(obj, file.fileName().toUtf8().constData());
@@ -235,6 +236,7 @@ void SceneSwitcher::on_importSettings_clicked()
 	switcher->loadFileSwitches(obj);
 	switcher->loadMediaSwitches(obj);
 	switcher->loadTimeSwitches(obj);
+	switcher->loadImgCmpSettings(obj);
 	switcher->loadGeneralSettings(obj);
 
 	obs_data_release(obj);
