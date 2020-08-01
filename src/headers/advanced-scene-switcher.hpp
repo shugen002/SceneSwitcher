@@ -50,6 +50,22 @@ public:
 	void UpdateIdleDataScene(const QString &name);
 
 	void loadUI();
+	void populateSceneSelection(QComboBox *sel, bool addPrevious);
+	void populateTransitionSelection(QComboBox *sel);
+	void populateWindowSelection(QComboBox *sel);
+	void setupGeneralTab();
+	void setupTitleTab();
+	void setupExecutableTab();
+	void setupRegionTab();
+	void setupPauseTab();
+	void setupSequenceTab();
+	void setupTransitionsTab();
+	void setupIdleTab();
+	void setupRandomTab();
+	void setupMediaTab();
+	void setupFileTab();
+	void setupTimeTab();
+	void setupImageTab();
 	void setTabOrder();
 
 public slots:
@@ -92,6 +108,7 @@ public slots:
 	void on_sceneRoundTripLoad_clicked();
 	void on_sceneRoundTripUp_clicked();
 	void on_sceneRoundTripDown_clicked();
+	void on_sceneRoundTripDelayUnits_currentIndexChanged(int index);
 
 	void on_autoStopSceneCheckBox_stateChanged(int state);
 	void on_autoStopScenes_currentTextChanged(const QString &text);

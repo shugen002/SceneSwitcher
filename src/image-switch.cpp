@@ -411,7 +411,7 @@ void matchesExactly(gs_texture *frame1, gs_texture *frame2, bool &match)
 	//gs_texture_get_obj
 }
 
-void isSimilar(gs_texture *frame1, gs_texture *frame2,int &similarity,
+void isSimilar(gs_texture *frame1, gs_texture *frame2, int &similarity,
 	       bool &match)
 {
 	;
@@ -422,7 +422,7 @@ void SwitcherData::checkImageSwitch(bool &match, OBSWeakSource &scene,
 {
 	if (!helperFilterM.try_lock())
 		return;
-	for (auto& s : imgCmpSwitches) {
+	for (auto &s : imgCmpSwitches) {
 		auto it = weakSoruceToFilterSource.find(s.source);
 		if (it == weakSoruceToFilterSource.end())
 			break;
@@ -539,4 +539,43 @@ void SwitcherData::checkImageSwitch(bool &match, OBSWeakSource &scene,
 			break;
 		}
 	}*/
+}
+
+void SceneSwitcher::setupImageTab()
+{
+	populateSceneSelection(ui->imgCmpScenes, true);
+	populateTransitionSelection(ui->imgCmpTransitions);
+
+	auto sourceEnumVideoOut = [](void *data, obs_source_t *source) -> bool {
+		QComboBox *combo = reinterpret_cast<QComboBox *>(data);
+		uint32_t flags = obs_source_get_output_flags(source);
+
+		if ((flags & OBS_SOURCE_VIDEO) != 0) {
+			const char *name = obs_source_get_name(source);
+			combo->addItem(name);
+		}
+
+		return true;
+	};
+
+	obs_enum_sources(sourceEnumVideoOut, ui->imgCmpSources);
+
+	ui->imgCmpMatchType->addItem("exactly matches");
+	ui->imgCmpMatchType->addItem("is similar to");
+
+	for (auto &s : switcher->imgCmpSwitches) {
+		std::string sceneName = (s.usePreviousScene)
+						? PREVIOUS_SCENE_NAME
+						: GetWeakSourceName(s.scene);
+		std::string transitionName = GetWeakSourceName(s.transition);
+		std::string sourceName = GetWeakSourceName(s.source);
+
+		QString listText = MakeImgCmpSwitchName(
+			sourceName.c_str(), s.matchType, s.similarity,
+			s.filePath.c_str(), sceneName.c_str(),
+			transitionName.c_str());
+		QListWidgetItem *item =
+			new QListWidgetItem(listText, ui->imgCmpSwitches);
+		item->setData(Qt::UserRole, listText);
+	}
 }
