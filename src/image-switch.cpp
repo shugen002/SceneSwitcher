@@ -403,11 +403,27 @@ void matchesExactly(gs_texture *frame1, gs_texture *frame2, bool &match)
 
 	uint8_t *ptr1, *ptr2;
 	uint32_t linesize1, linesize2;
-	if (gs_texture_map(frame1, &ptr1, &linesize1) && gs_texture_map(frame2, &ptr2, &linesize2)) {
-		;
-		gs_texture_unmap(frame1);
-		gs_texture_unmap(frame1);
+	if (!gs_texture_map(frame1, &ptr1, &linesize1)) {
+		obs_leave_graphics();
+		return;
 	}
+
+	//gs_load_texture(frame2, 1);
+	//if (!gs_texture_map(frame2, &ptr2, &linesize2)) {
+	//	gs_texture_unmap(frame1);
+	//	obs_leave_graphics();
+	//	return;
+	//}
+
+	enum gs_color_format format;
+	uint32_t cx;
+	uint32_t cy;
+	uint8_t *data = gs_create_texture_file_data("C:/Users/Till/Pictures/asdf.png", &format, &cx, &cy);
+	gs_texture_t *tex = NULL;
+
+	gs_texture_unmap(frame1);
+	//gs_texture_unmap(frame1);
+
 	obs_leave_graphics();
 }
 

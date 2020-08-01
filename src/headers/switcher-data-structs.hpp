@@ -263,7 +263,7 @@ struct ImgCmpSwitch {
 	imgCmpMatchType matchType;
 	int similarity;
 	std::string filePath;
-	gs_texture *tex = nullptr; //gs_texture_create_from_file(path.c_str()
+	gs_texture *tex = nullptr;
 	bool usePreviousScene;
 	std::string imgCmpSwitchStr;
 
@@ -296,7 +296,9 @@ struct ImgCmpSwitch {
 		  usePreviousScene(other.usePreviousScene),
 		  imgCmpSwitchStr(other.imgCmpSwitchStr)
 	{
+		obs_enter_graphics();
 		tex = gs_texture_create_from_file(other.filePath.c_str());
+		obs_leave_graphics();
 	}
 
 	ImgCmpSwitch(ImgCmpSwitch &&other)
