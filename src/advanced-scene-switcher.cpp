@@ -315,7 +315,6 @@ bool SwitcherData::sceneChangedDuringWait()
 	obs_source_release(currentSource);
 	if (waitScene && currentSource != waitScene)
 		r = true;
-	waitScene = NULL;
 	return r;
 }
 
