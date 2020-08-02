@@ -100,8 +100,6 @@ void SceneSwitcher::on_sceneRoundTripAdd_clicked()
 				}
 			}
 		}
-
-		ui->sceneRoundTrips->sortItems();
 	}
 }
 
@@ -148,6 +146,50 @@ void SceneSwitcher::on_sceneRoundTripSave_clicked()
 	obs_data_release(obj);
 }
 
+// to be removed once support for old file format is dropped
+bool oldSceneRoundTripLoad(QFile *file)
+{
+	QTextStream in(file);
+	std::vector<QString> lines;
+
+	std::vector<SceneRoundTripSwitch> newSceneRoundTripSwitch;
+
+	while (!in.atEnd()) {
+		QString line = in.readLine();
+		lines.push_back(line);
+		if (lines.size() == 5) {
+			OBSWeakSource scene1 = GetWeakSourceByQString(lines[0]);
+			OBSWeakSource scene2 = GetWeakSourceByQString(lines[1]);
+			OBSWeakSource transition =
+				GetWeakTransitionByQString(lines[4]);
+
+			if (WeakSourceValid(scene1) &&
+			    ((lines[1] == QString(PREVIOUS_SCENE_NAME)) ||
+			     (WeakSourceValid(scene2))) &&
+			    WeakSourceValid(transition)) {
+				newSceneRoundTripSwitch.emplace_back(
+					SceneRoundTripSwitch(
+						GetWeakSourceByQString(lines[0]),
+						GetWeakSourceByQString(lines[1]),
+						GetWeakTransitionByQString(
+							lines[4]),
+						lines[2].toDouble() / 1000.,
+						(lines[1] ==
+						 QString(PREVIOUS_SCENE_NAME)),
+						lines[3].toStdString()));
+			}
+			lines.clear();
+		}
+	}
+
+	if (lines.size() != 0 || newSceneRoundTripSwitch.size() == 0)
+		return false;
+
+	switcher->sceneRoundTripSwitches.clear();
+	switcher->sceneRoundTripSwitches = newSceneRoundTripSwitch;
+	return true;
+}
+
 void SceneSwitcher::on_sceneRoundTripLoad_clicked()
 {
 	std::lock_guard<std::mutex> lock(switcher->m);
@@ -167,9 +209,23 @@ void SceneSwitcher::on_sceneRoundTripLoad_clicked()
 
 	if (!obj) {
 		QMessageBox Msgbox;
-		Msgbox.setText(
-			"Advanced Scene Switcher failed to import settings (try import with previous version of the plugin)");
+		QString txt =
+			"Advanced Scene Switcher failed to import settings!\n";
+		txt += "Falling back to old format.";
+		Msgbox.setText(txt);
 		Msgbox.exec();
+		if (oldSceneRoundTripLoad(&file)) {
+			QString txt =
+				"Advanced Scene Switcher settings imported successfully!\n";
+			txt += "Please resave settings as support for old format will be dropped in next version.";
+			Msgbox.setText(txt);
+			Msgbox.exec();
+			close();
+		} else {
+			Msgbox.setText(
+				"Advanced Scene Switcher failed to import settings!");
+			Msgbox.exec();
+		}
 		return;
 	}
 	switcher->loadSceneRoundTripSwitches(obj);
@@ -177,7 +233,7 @@ void SceneSwitcher::on_sceneRoundTripLoad_clicked()
 
 	QMessageBox Msgbox;
 	Msgbox.setText(
-		"Advanced Scene Switcher settings imported successfully");
+		"Advanced Scene Switcher settings imported successfully!");
 	Msgbox.exec();
 	close();
 }
@@ -368,11 +424,12 @@ void SwitcherData::loadSceneRoundTripSwitches(obs_data_t *obj)
 		// To be removed in future version
 		// to be compatible with older versions
 		if (!obs_data_has_user_value(array_obj, "delay")) {
-			delay = obs_data_get_int(array_obj,
-						 "sceneRoundTripDelay");
-			delay = delay * 1000 +
-				obs_data_get_int(array_obj,
-						 "sceneRoundTripDelayMs");
+			delay = double(obs_data_get_int(array_obj,
+							"sceneRoundTripDelay"));
+			delay = delay * 1000. +
+				double(obs_data_get_int(
+					array_obj, "sceneRoundTripDelayMs"));
+			delay /= 1000.;
 		} else {
 			delay = obs_data_get_double(array_obj, "delay");
 		}
@@ -394,13 +451,14 @@ void SwitcherData::loadSceneRoundTripSwitches(obs_data_t *obj)
 	}
 	obs_data_array_release(sceneRoundTripArray);
 }
+
 void SceneSwitcher::setupSequenceTab()
 {
 	populateSceneSelection(ui->sceneRoundTripScenes1, false);
 	populateSceneSelection(ui->sceneRoundTripScenes2, true);
 	populateTransitionSelection(ui->sceneRoundTripTransitions);
 
-	int smallestDelay = switcher->interval;
+	double smallestDelay = double(switcher->interval) / 1000;
 	for (auto &s : switcher->sceneRoundTripSwitches) {
 		std::string sceneName1 = GetWeakSourceName(s.scene1);
 		std::string sceneName2 = (s.usePreviousScene)
