@@ -35,7 +35,7 @@
    <item>
     <widget class="QTabWidget" name="tabWidget">
      <property name="currentIndex">
-      <number>0</number>
+      <number>12</number>
      </property>
      <property name="movable">
       <bool>true</bool>
@@ -3597,7 +3597,7 @@
        <item>
         <widget class="QLabel" name="label_67">
          <property name="text">
-          <string>Please note: The image data is only loaded once during start of the scene switcher - so modify the file will have no effect unless you manually stop / start the scene switcher (or press this button)</string>
+          <string>Please note: The image data is only loaded once during start of the scene switcher - modifing the file will have no effect unless you manually stop / start the scene switcher</string>
          </property>
         </widget>
        </item>
