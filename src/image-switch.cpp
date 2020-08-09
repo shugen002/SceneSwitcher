@@ -9,6 +9,7 @@
 #include <media-io/video-scaler.h>
 
 #include <graphics/graphics.h>
+#include <graphics/graphics-internal.h>
 
 #include "headers/advanced-scene-switcher.hpp"
 #include "headers/helper-filter.hpp"
@@ -403,6 +404,10 @@ void matchesExactly(gs_texture *frame1, gs_texture *frame2, bool &match)
 
 	uint8_t *ptr1, *ptr2;
 	uint32_t linesize1, linesize2;
+
+	//gs_texture_2d *tex1 = static_cast<gs_texture_2d *>(frame1);
+	//gs_texture_2d *tex2 = static_cast<gs_texture_2d *>(frame2);
+
 	if (!gs_texture_map(frame1, &ptr1, &linesize1)) {
 		obs_leave_graphics();
 		return;
@@ -418,7 +423,7 @@ void matchesExactly(gs_texture *frame1, gs_texture *frame2, bool &match)
 	enum gs_color_format format;
 	uint32_t cx;
 	uint32_t cy;
-	uint8_t *data = gs_create_texture_file_data("C:/Users/Till/Pictures/asdf.png", &format, &cx, &cy);
+	//uint8_t *data = gs_create_texture_file_data("C:/Users/Till/Pictures/asdf.png", &format, &cx, &cy);
 	gs_texture_t *tex = NULL;
 
 	gs_texture_unmap(frame1);

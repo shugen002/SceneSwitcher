@@ -72,7 +72,6 @@ static void helper_filter_tick(void *data, float t)
 	struct frameData *filter_data = (frameData *)data;
 	filter_data->secSinceLastCheck += t;
 	if (filter_data->secSinceLastCheck * 1000 < filter_data->interval) {
-		filter_data->grabFrame = false;
 		return;
 	}
 	filter_data->secSinceLastCheck = 0;
@@ -83,22 +82,36 @@ static void helper_filter_render(void *data, gs_effect_t *effect)
 {
 	struct frameData *filter_data = (frameData *)data;
 
-	if (filter_data->grabFrame && filter_data->m.try_lock()) {
-		gs_texture *cur_tex = gs_get_render_target();
-		gs_texture_destroy(filter_data->tex);
-		filter_data->tex = gs_texture_create(
-			gs_texture_get_width(cur_tex),
-			gs_texture_get_height(cur_tex), GS_RGBA, 1,
-			nullptr, GS_DYNAMIC);
-		gs_copy_texture(filter_data->tex, cur_tex);
-		filter_data->m.unlock();
-	}
 
 	// do nothing
 	gs_effect_t *default_effect = obs_get_base_effect(OBS_EFFECT_DEFAULT);
 	if (!obs_source_process_filter_begin(filter_data->context, GS_RGBA,
 					     OBS_ALLOW_DIRECT_RENDERING))
 		return;
+
+	if (filter_data->grabFrame && filter_data->m.try_lock()) {
+		gs_texture *cur_tex = gs_get_render_target();
+		gs_texture_destroy(filter_data->tex);
+
+		// probably need to switch to staging surface
+		filter_data->tex = gs_texture_create(
+			gs_texture_get_width(cur_tex),
+			gs_texture_get_height(cur_tex), GS_RGBA, 1,
+			nullptr, GS_DYNAMIC);
+		gs_copy_texture(filter_data->tex, cur_tex);
+
+		gs_stagesurf_t* stage = gs_stagesurface_create(gs_texture_get_width(cur_tex), gs_texture_get_height(cur_tex), GS_RGBA);
+		gs_stage_texture(stage, cur_tex);
+
+		// testing
+		uint8_t *ptr1, *ptr2;
+		uint32_t linesize1, linesize2;
+		gs_stagesurface_map(stage, &ptr1, &linesize1);
+
+		filter_data->grabFrame = false;
+		filter_data->m.unlock();
+	}
+
 	obs_source_process_filter_end(
 		filter_data->context, default_effect,
 		obs_source_get_width(
