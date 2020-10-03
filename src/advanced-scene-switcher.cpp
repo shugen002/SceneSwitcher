@@ -16,6 +16,7 @@
 #include "headers/switcher-data-structs.hpp"
 #include "headers/advanced-scene-switcher.hpp"
 #include "headers/utility.hpp"
+#include "headers/curl-helper.hpp"
 
 SwitcherData *switcher = nullptr;
 
@@ -44,7 +45,7 @@ void SceneSwitcher::populateSceneSelection(QComboBox *sel, bool addPrevious)
 	}
 
 	if (addPrevious)
-		sel->addItem(PREVIOUS_SCENE_NAME);
+		sel->addItem(previous_scene_name);
 }
 
 void SceneSwitcher::populateTransitionSelection(QComboBox *sel)
@@ -90,6 +91,7 @@ void SceneSwitcher::loadUI()
 	setupFileTab();
 	setupTimeTab();
 	setupImageTab();
+	setupAudioTab();
 
 	setTabOrder();
 
@@ -112,7 +114,7 @@ static void SaveSceneSwitcher(obs_data_t *save_data, bool saving, void *)
 		switcher->saveWindowTitleSwitches(obj);
 		switcher->saveScreenRegionSwitches(obj);
 		switcher->savePauseSwitches(obj);
-		switcher->saveSceneRoundTripSwitches(obj);
+		switcher->saveSceneSequenceSwitches(obj);
 		switcher->saveSceneTransitions(obj);
 		switcher->saveIdleSwitches(obj);
 		switcher->saveExecutableSwitches(obj);
@@ -121,6 +123,7 @@ static void SaveSceneSwitcher(obs_data_t *save_data, bool saving, void *)
 		switcher->saveMediaSwitches(obj);
 		switcher->saveTimeSwitches(obj);
 		switcher->saveImgCmpSettings(obj);
+		switcher->saveAudioSwitches(obj);
 		switcher->saveGeneralSettings(obj);
 
 		obs_data_set_obj(save_data, "advanced-scene-switcher", obj);
@@ -138,7 +141,7 @@ static void SaveSceneSwitcher(obs_data_t *save_data, bool saving, void *)
 		switcher->loadWindowTitleSwitches(obj);
 		switcher->loadScreenRegionSwitches(obj);
 		switcher->loadPauseSwitches(obj);
-		switcher->loadSceneRoundTripSwitches(obj);
+		switcher->loadSceneSequenceSwitches(obj);
 		switcher->loadSceneTransitions(obj);
 		switcher->loadIdleSwitches(obj);
 		switcher->loadExecutableSwitches(obj);
@@ -147,6 +150,7 @@ static void SaveSceneSwitcher(obs_data_t *save_data, bool saving, void *)
 		switcher->loadMediaSwitches(obj);
 		switcher->loadTimeSwitches(obj);
 		switcher->loadImgCmpSettings(obj);
+		switcher->loadAudioSwitches(obj);
 		switcher->loadGeneralSettings(obj);
 
 		obs_data_release(obj);
@@ -155,9 +159,11 @@ static void SaveSceneSwitcher(obs_data_t *save_data, bool saving, void *)
 
 		switcher->m.unlock();
 
-		if (switcher->stop)
-			switcher->Stop();
-		else
+		// stop the scene switcher at least once
+		// to avoid issues with scene collection changes
+		bool start = !switcher->stop;
+		switcher->Stop();
+		if (start)
 			switcher->Start();
 	}
 }
@@ -168,9 +174,6 @@ static void SaveSceneSwitcher(obs_data_t *save_data, bool saving, void *)
 void SwitcherData::Thread()
 {
 	blog(LOG_INFO, "Advanced Scene Switcher started");
-	//to avoid scene duplication when rapidly switching scene collection
-	std::this_thread::sleep_for(std::chrono::seconds(2));
-
 	int sleep = 0;
 
 	while (true) {
@@ -201,51 +204,61 @@ void SwitcherData::Thread()
 		if (switcher->stop) {
 			break;
 		}
+
 		setDefaultSceneTransitions();
+
 		if (autoStopEnable) {
 			autoStopStreamAndRecording();
 		}
+
+		if (autoStartEnable) {
+			autoStartStreamRecording();
+		}
+
 		if (checkPause()) {
 			continue;
 		}
 
 		for (int switchFuncName : functionNamesByPriority) {
 			switch (switchFuncName) {
-			case READ_FILE_FUNC:
+			case read_file_func:
 				checkSwitchInfoFromFile(match, scene,
 							transition);
 				checkFileContent(match, scene, transition);
 				break;
-			case IDLE_FUNC:
+			case idle_func:
 				checkIdleSwitch(match, scene, transition);
 				break;
-			case EXE_FUNC:
+			case exe_func:
 				checkExeSwitch(match, scene, transition);
 				break;
 
-			case SCREEN_REGION_FUNC:
+			case screen_region_func:
 				checkScreenRegionSwitch(match, scene,
 							transition);
 				break;
-			case WINDOW_TITLE_FUNC:
+			case window_title_func:
 				checkWindowTitleSwitch(match, scene,
 						       transition);
 				break;
-			case ROUND_TRIP_FUNC:
-				checkSceneRoundTrip(match, scene, transition,
-						    lock);
+			case round_trip_func:
+				checkSceneSequence(match, scene, transition,
+						   lock);
 				if (sceneChangedDuringWait()) //scene might have changed during the sleep
 				{
 					goto startLoop;
 				}
 				break;
-			case MEDIA_FUNC:
+			case media_func:
 				checkMediaSwitch(match, scene, transition);
 				break;
-			case TIME_FUNC:
+			case time_func:
 				checkTimeSwitch(match, scene, transition);
 				break;
-			case IMG_FUNC:
+			case audio_func:
+				checkAudioSwitch(match, scene, transition);
+				break;
+			case img_func:
 				checkImageSwitch(match, scene, transition);
 				break;
 			}
@@ -347,6 +360,13 @@ void SwitcherData::Stop()
  ********************************************************************************/
 extern "C" void FreeSceneSwitcher()
 {
+	if (loaded_curl_lib) {
+		if (switcher->curl && f_curl_cleanup)
+			f_curl_cleanup(switcher->curl);
+		delete loaded_curl_lib;
+		loaded_curl_lib = nullptr;
+	}
+
 	delete switcher;
 	switcher = nullptr;
 }
@@ -367,6 +387,19 @@ void handleSceneChange(SwitcherData *s)
 		s->previousScene = s->PreviousScene2;
 		s->PreviousScene2 = ws;
 	}
+
+	//reset autostart
+	s->autoStartedRecently = false;
+}
+
+void setLiveTime(SwitcherData *s)
+{
+	s->liveTime = QDateTime::currentDateTime();
+}
+
+void resetLiveTime(SwitcherData *s)
+{
+	s->liveTime = QDateTime();
 }
 
 static void OBSEvent(enum obs_frontend_event event, void *switcher)
@@ -377,6 +410,14 @@ static void OBSEvent(enum obs_frontend_event event, void *switcher)
 		break;
 	case OBS_FRONTEND_EVENT_SCENE_CHANGED:
 		handleSceneChange((SwitcherData *)switcher);
+		break;
+	case OBS_FRONTEND_EVENT_RECORDING_STARTED:
+	case OBS_FRONTEND_EVENT_STREAMING_STARTED:
+		setLiveTime((SwitcherData *)switcher);
+		break;
+	case OBS_FRONTEND_EVENT_RECORDING_STOPPED:
+	case OBS_FRONTEND_EVENT_STREAMING_STOPPED:
+		resetLiveTime((SwitcherData *)switcher);
 		break;
 	default:
 		break;
@@ -389,6 +430,10 @@ extern "C" void InitSceneSwitcher()
 		"Advanced Scene Switcher");
 
 	switcher = new SwitcherData;
+
+	if (loadCurl() && f_curl_init) {
+		switcher->curl = f_curl_init();
+	}
 
 	auto cb = []() {
 		QMainWindow *window =
@@ -413,13 +458,13 @@ extern "C" void InitSceneSwitcher()
 		"startStopToggleSwitcherHotkey",
 		"Toggle Start/Stop for the Advanced Scene Switcher",
 		startStopToggleHotkeyFunc, NULL);
-	loadKeybinding(toggleHotkeyId, TOGGLE_HOTKEY_PATH);
+	loadKeybinding(toggleHotkeyId, toggle_hotkey_path);
 	obs_hotkey_id startHotkeyId = obs_hotkey_register_frontend(
 		"startSwitcherHotkey", "Start the Advanced Scene Switcher",
 		startHotkeyFunc, NULL);
-	loadKeybinding(startHotkeyId, START_HOTKEY_PATH);
+	loadKeybinding(startHotkeyId, start_hotkey_path);
 	obs_hotkey_id stopHotkeyId = obs_hotkey_register_frontend(
 		"stopSwitcherHotkey", "Stop the Advanced Scene Switcher",
 		stopHotkeyFunc, NULL);
-	loadKeybinding(stopHotkeyId, STOP_HOTKEY_PATH);
+	loadKeybinding(stopHotkeyId, stop_hotkey_path);
 }

@@ -251,7 +251,7 @@ void SceneSwitcher::on_imgCmpAdd_clicked()
 	switcher->imgCmpSwitches.emplace_back(
 		scene, transition, source, matchType, similarity,
 		filePath.toUtf8().constData(),
-		(sceneName == QString(PREVIOUS_SCENE_NAME)),
+		(sceneName == QString(previous_scene_name)),
 		switchText.toUtf8().constData());
 
 	addHelperFilter(sourceName.toUtf8().constData());
@@ -302,7 +302,7 @@ void SwitcherData::saveImgCmpSettings(obs_data_t *obj)
 			obs_data_set_string(array_obj, "source", sourceName);
 			obs_data_set_string(array_obj, "scene",
 					    s.usePreviousScene
-						    ? PREVIOUS_SCENE_NAME
+						    ? previous_scene_name
 						    : sceneName);
 			obs_data_set_string(array_obj, "transition",
 					    transitionName);
@@ -352,7 +352,7 @@ void SwitcherData::loadImgCmpSettings(obs_data_t *obj)
 			GetWeakSourceByName(scene),
 			GetWeakTransitionByName(transition),
 			GetWeakSourceByName(source), matchType, similarity,
-			filePath, (strcmp(scene, PREVIOUS_SCENE_NAME) == 0),
+			filePath, (strcmp(scene, previous_scene_name) == 0),
 			imgCmpStr);
 
 		addHelperFilter(source);
@@ -586,7 +586,7 @@ void SceneSwitcher::setupImageTab()
 
 	for (auto &s : switcher->imgCmpSwitches) {
 		std::string sceneName = (s.usePreviousScene)
-						? PREVIOUS_SCENE_NAME
+						? previous_scene_name
 						: GetWeakSourceName(s.scene);
 		std::string transitionName = GetWeakSourceName(s.transition);
 		std::string sourceName = GetWeakSourceName(s.source);
@@ -599,4 +599,22 @@ void SceneSwitcher::setupImageTab()
 			new QListWidgetItem(listText, ui->imgCmpSwitches);
 		item->setData(Qt::UserRole, listText);
 	}
+}
+
+static inline QString MakeImgCmpSwitchName(const QString &source,
+					   imgCmpMatchType matchType,
+					   int similarity, const QString &file,
+					   const QString &scene,
+					   const QString &transition)
+{
+	QString switchName = QStringLiteral("If output of ") + source;
+	if (matchType == IMG_CMP_EXACT_MATCH)
+		switchName += QStringLiteral(" exactly matches ");
+	else if (matchType == IMG_CMP_SIMILAR)
+		switchName += QStringLiteral(" is similar (") +
+			      QString::number(similarity) +
+			      QStringLiteral(") to ");
+	switchName += file + QStringLiteral(" switch to ") + scene +
+		      QStringLiteral(" using ") + transition;
+	return switchName;
 }

@@ -35,13 +35,14 @@ if(BUILD_OUT_OF_TREE)
 		src/headers/advanced-scene-switcher.hpp
 		src/headers/switcher-data-structs.hpp
 		src/headers/utility.hpp
+<<<<<<< HEAD
 		src/headers/helper-filter.hpp
+=======
 		src/headers/curl-helper.hpp
 		src/headers/switch-audio.hpp
 		src/headers/switch-executable.hpp
 		src/headers/switch-file.hpp
 		src/headers/switch-idle.hpp
-		src/headers/switch-image.hpp
 		src/headers/switch-media.hpp
 		src/headers/switch-random.hpp
 		src/headers/switch-screen-region.hpp
@@ -50,19 +51,37 @@ if(BUILD_OUT_OF_TREE)
 		src/headers/switch-window.hpp
 		src/headers/swtich-sequence.hpp
 		src/headers/switch-generic.hpp
+>>>>>>> master
 		)
 
 	set(advanced-scene-switcher_SOURCES
 		${advanced-scene-switcher_SOURCES}
 		src/advanced-scene-switcher.cpp
 		src/advanced-scene-switcher-module.c
+<<<<<<< HEAD
+		src/scene-transitions.cpp
+		src/screen-region-switch.cpp
+		src/priority.cpp
+		src/executable-switch.cpp
+		src/idle-switch.cpp
+		src/image-switch.cpp
+		src/scene-round-trip.cpp
+		src/file-switch.cpp
+		src/window-title-switch.cpp
+		src/media-switch.cpp
+		src/hotkey.cpp
+		src/general.cpp
+		src/pause-switch.cpp
+		src/random.cpp
+		src/time-switch.cpp
+		src/helper-filter.cpp
+=======
 		src/switcher-data-structs.cpp
 		src/switch-transitions.cpp
 		src/switch-screen-region.cpp
 		src/switch-priority.cpp
 		src/switch-executable.cpp
 		src/switch-idle.cpp
-		src/switch-image.cpp
 		src/switch-sequence.cpp
 		src/switch-file.cpp
 		src/switch-window.cpp
@@ -74,7 +93,7 @@ if(BUILD_OUT_OF_TREE)
 		src/switch-time.cpp
 		src/switch-audio.cpp
 		src/curl-helper.cpp
-		src/helper-filter.cpp
+>>>>>>> master
 		)
 
 	set(advanced-scene-switcher_UI
@@ -168,7 +187,6 @@ if(BUILD_OUT_OF_TREE)
 		install(FILES ${ASS_TRANSLATION_FILES}
 				DESTINATION "${CMAKE_INSTALL_PREFIX}/share/obs/obs-plugins/advanced-scene-switcher/locale")
 	endif()
-	install_obs_plugin(advanced-scene-switcher data)
 else ()
 	# in-tree build
 	if(APPLE)
@@ -187,14 +205,15 @@ else ()
 		src/headers/advanced-scene-switcher.hpp
 		src/headers/switcher-data-structs.hpp
 		src/headers/utility.hpp
+<<<<<<< HEAD
 		src/headers/helper-filter.hpp
+=======
 		src/headers/curl-helper.hpp
 		src/headers/volume-control.hpp
 		src/headers/switch-audio.hpp
 		src/headers/switch-executable.hpp
 		src/headers/switch-file.hpp
 		src/headers/switch-idle.hpp
-		src/headers/switch-image.hpp
 		src/headers/switch-media.hpp
 		src/headers/switch-random.hpp
 		src/headers/switch-screen-region.hpp
@@ -203,19 +222,37 @@ else ()
 		src/headers/switch-window.hpp
 		src/headers/swtich-sequence.hpp
 		src/headers/switch-generic.hpp
+>>>>>>> master
 		)
 
 	set(advanced-scene-switcher_SOURCES
 		${advanced-scene-switcher_SOURCES}
 		src/advanced-scene-switcher.cpp
 		src/advanced-scene-switcher-module.c
+<<<<<<< HEAD
+		src/scene-transitions.cpp
+		src/screen-region-switch.cpp
+		src/priority.cpp
+		src/executable-switch.cpp
+		src/idle-switch.cpp
+		src/image-switch.cpp
+		src/scene-round-trip.cpp
+		src/file-switch.cpp
+		src/window-title-switch.cpp
+		src/media-switch.cpp
+		src/hotkey.cpp
+		src/general.cpp
+		src/pause-switch.cpp
+		src/random.cpp
+		src/time-switch.cpp
+		src/helper-filter.cpp
+=======
 		src/switcher-data-structs.cpp
 		src/switch-transitions.cpp
 		src/switch-screen-region.cpp
 		src/switch-priority.cpp
 		src/switch-executable.cpp
 		src/switch-idle.cpp
-		src/switch-image.cpp
 		src/switch-sequence.cpp
 		src/switch-file.cpp
 		src/switch-window.cpp
@@ -228,7 +265,7 @@ else ()
 		src/switch-audio.cpp
 		src/curl-helper.cpp
 		src/volume-control.cpp
-		src/helper-filter.cpp
+>>>>>>> master
 		)
 
 	set(advanced-scene-switcher_UI

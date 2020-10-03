@@ -159,6 +159,78 @@ void SwitcherData::autoStopStreamAndRecording()
 	obs_weak_source_release(ws);
 }
 
+void SceneSwitcher::on_autoStartType_currentIndexChanged(int index)
+{
+	if (loading)
+		return;
+	std::lock_guard<std::mutex> lock(switcher->m);
+	switcher->autoStartType = (AutoStartType)index;
+}
+
+void SceneSwitcher::on_autoStartScenes_currentTextChanged(const QString &text)
+{
+	if (loading)
+		return;
+
+	std::lock_guard<std::mutex> lock(switcher->m);
+	UpdateAutoStartScene(text);
+}
+
+void SceneSwitcher::on_autoStartSceneCheckBox_stateChanged(int state)
+{
+	if (loading)
+		return;
+
+	std::lock_guard<std::mutex> lock(switcher->m);
+	if (!state) {
+		ui->autoStartScenes->setDisabled(true);
+		ui->autoStartType->setDisabled(true);
+		switcher->autoStartEnable = false;
+	} else {
+		ui->autoStartScenes->setDisabled(false);
+		ui->autoStartType->setDisabled(false);
+		switcher->autoStartEnable = true;
+		if (!switcher->autoStartScene)
+			UpdateAutoStartScene(
+				ui->autoStartScenes->currentText());
+	}
+}
+
+void SceneSwitcher::UpdateAutoStartScene(const QString &name)
+{
+	obs_source_t *scene = obs_get_source_by_name(name.toUtf8().constData());
+	obs_weak_source_t *ws = obs_source_get_weak_source(scene);
+
+	switcher->autoStartScene = ws;
+
+	obs_weak_source_release(ws);
+	obs_source_release(scene);
+}
+
+void SwitcherData::autoStartStreamRecording()
+{
+	obs_source_t *currentSource = obs_frontend_get_current_scene();
+	obs_weak_source_t *ws = obs_source_get_weak_source(currentSource);
+
+	if (autoStartedRecently)
+		return;
+
+	if (ws && autoStartScene == ws) {
+		if ((switcher->autoStartType == STREAMING ||
+		     switcher->autoStartType == RECORINDGSTREAMING) &&
+		    !obs_frontend_streaming_active())
+			obs_frontend_streaming_start();
+		if ((switcher->autoStartType == RECORDING ||
+		     switcher->autoStartType == RECORINDGSTREAMING) &&
+		    !obs_frontend_recording_active())
+			obs_frontend_recording_start();
+	}
+	obs_source_release(currentSource);
+	obs_weak_source_release(ws);
+
+	autoStartedRecently = true;
+}
+
 void SceneSwitcher::on_verboseLogging_stateChanged(int state)
 {
 	if (loading)
@@ -185,7 +257,7 @@ void SceneSwitcher::on_exportSettings_clicked()
 	switcher->saveWindowTitleSwitches(obj);
 	switcher->saveScreenRegionSwitches(obj);
 	switcher->savePauseSwitches(obj);
-	switcher->saveSceneRoundTripSwitches(obj);
+	switcher->saveSceneSequenceSwitches(obj);
 	switcher->saveSceneTransitions(obj);
 	switcher->saveIdleSwitches(obj);
 	switcher->saveExecutableSwitches(obj);
@@ -194,6 +266,7 @@ void SceneSwitcher::on_exportSettings_clicked()
 	switcher->saveMediaSwitches(obj);
 	switcher->saveTimeSwitches(obj);
 	switcher->saveImgCmpSettings(obj);
+	switcher->saveAudioSwitches(obj);
 	switcher->saveGeneralSettings(obj);
 
 	obs_data_save_json(obj, file.fileName().toUtf8().constData());
@@ -230,7 +303,7 @@ void SceneSwitcher::on_importSettings_clicked()
 	switcher->loadWindowTitleSwitches(obj);
 	switcher->loadScreenRegionSwitches(obj);
 	switcher->loadPauseSwitches(obj);
-	switcher->loadSceneRoundTripSwitches(obj);
+	switcher->loadSceneSequenceSwitches(obj);
 	switcher->loadSceneTransitions(obj);
 	switcher->loadIdleSwitches(obj);
 	switcher->loadExecutableSwitches(obj);
@@ -239,6 +312,7 @@ void SceneSwitcher::on_importSettings_clicked()
 	switcher->loadMediaSwitches(obj);
 	switcher->loadTimeSwitches(obj);
 	switcher->loadImgCmpSettings(obj);
+	switcher->loadAudioSwitches(obj);
 	switcher->loadGeneralSettings(obj);
 
 	obs_data_release(obj);
@@ -293,8 +367,10 @@ int findTabIndex(QTabBar *bar, int pos)
 		tabName = "Sequence";
 		break;
 	case 12:
-		tabName = "Image";
+		tabName = "Audio";
 		break;
+	case 13:
+		tabName = "Image";
 	}
 
 	for (int i = 0; i < bar->count(); ++i) {
@@ -350,6 +426,13 @@ void SwitcherData::saveGeneralSettings(obs_data_t *obj)
 	obs_data_set_string(obj, "autoStopSceneName",
 			    autoStopSceneName.c_str());
 
+	std::string autoStartSceneName =
+		GetWeakSourceName(switcher->autoStartScene);
+	obs_data_set_bool(obj, "autoStartEnable", switcher->autoStartEnable);
+	obs_data_set_int(obj, "autoStartType", switcher->autoStartType);
+	obs_data_set_string(obj, "autoStartSceneName",
+			    autoStartSceneName.c_str());
+
 	obs_data_set_bool(obj, "verbose", switcher->verbose);
 
 	obs_data_set_int(obj, "priority0",
@@ -385,12 +468,13 @@ void SwitcherData::saveGeneralSettings(obs_data_t *obj)
 	obs_data_set_int(obj, "timeTabPos", switcher->tabOrder[9]);
 	obs_data_set_int(obj, "idleTabPos", switcher->tabOrder[10]);
 	obs_data_set_int(obj, "sequenceTabPos", switcher->tabOrder[11]);
-	obs_data_set_int(obj, "imageTabPos", switcher->tabOrder[12]);
+	obs_data_set_int(obj, "audioTabPos", switcher->tabOrder[12]);
+	obs_data_set_int(obj, "imageTabPos", switcher->tabOrder[13]);
 }
 
 void SwitcherData::loadGeneralSettings(obs_data_t *obj)
 {
-	obs_data_set_default_int(obj, "interval", DEFAULT_INTERVAL);
+	obs_data_set_default_int(obj, "interval", default_interval);
 	switcher->interval = obs_data_get_int(obj, "interval");
 
 	obs_data_set_default_int(obj, "switch_if_not_matching", NO_SWITCH);
@@ -414,17 +498,25 @@ void SwitcherData::loadGeneralSettings(obs_data_t *obj)
 	switcher->autoStopEnable = obs_data_get_bool(obj, "autoStopEnable");
 	switcher->autoStopScene = GetWeakSourceByName(autoStopScene.c_str());
 
+	std::string autoStartScene =
+		obs_data_get_string(obj, "autoStartSceneName");
+	switcher->autoStartEnable = obs_data_get_bool(obj, "autoStartEnable");
+	switcher->autoStartType =
+		(AutoStartType)obs_data_get_int(obj, "autoStartType");
+	switcher->autoStartScene = GetWeakSourceByName(autoStartScene.c_str());
+
 	switcher->verbose = obs_data_get_bool(obj, "verbose");
 
-	obs_data_set_default_int(obj, "priority0", DEFAULT_PRIORITY_0);
-	obs_data_set_default_int(obj, "priority1", DEFAULT_PRIORITY_1);
-	obs_data_set_default_int(obj, "priority2", DEFAULT_PRIORITY_2);
-	obs_data_set_default_int(obj, "priority3", DEFAULT_PRIORITY_3);
-	obs_data_set_default_int(obj, "priority4", DEFAULT_PRIORITY_4);
-	obs_data_set_default_int(obj, "priority5", DEFAULT_PRIORITY_5);
-	obs_data_set_default_int(obj, "priority6", DEFAULT_PRIORITY_6);
-	obs_data_set_default_int(obj, "priority7", DEFAULT_PRIORITY_7);
-	obs_data_set_default_int(obj, "priority8", DEFAULT_PRIORITY_8);
+	obs_data_set_default_int(obj, "priority0", default_priority_0);
+	obs_data_set_default_int(obj, "priority1", default_priority_1);
+	obs_data_set_default_int(obj, "priority2", default_priority_2);
+	obs_data_set_default_int(obj, "priority3", default_priority_3);
+	obs_data_set_default_int(obj, "priority4", default_priority_4);
+	obs_data_set_default_int(obj, "priority5", default_priority_5);
+	obs_data_set_default_int(obj, "priority6", default_priority_6);
+	obs_data_set_default_int(obj, "priority7", default_priority_7);
+	obs_data_set_default_int(obj, "priority8", default_priority_8);
+	obs_data_set_default_int(obj, "priority9", default_priority_9);
 
 	switcher->functionNamesByPriority[0] =
 		(obs_data_get_int(obj, "priority0"));
@@ -445,15 +537,16 @@ void SwitcherData::loadGeneralSettings(obs_data_t *obj)
 	switcher->functionNamesByPriority[8] =
 		(obs_data_get_int(obj, "priority8"));
 	if (!switcher->prioFuncsValid()) {
-		switcher->functionNamesByPriority[0] = (DEFAULT_PRIORITY_0);
-		switcher->functionNamesByPriority[1] = (DEFAULT_PRIORITY_1);
-		switcher->functionNamesByPriority[2] = (DEFAULT_PRIORITY_2);
-		switcher->functionNamesByPriority[3] = (DEFAULT_PRIORITY_3);
-		switcher->functionNamesByPriority[4] = (DEFAULT_PRIORITY_4);
-		switcher->functionNamesByPriority[5] = (DEFAULT_PRIORITY_5);
-		switcher->functionNamesByPriority[6] = (DEFAULT_PRIORITY_6);
-		switcher->functionNamesByPriority[7] = (DEFAULT_PRIORITY_7);
-		switcher->functionNamesByPriority[8] = (DEFAULT_PRIORITY_8);
+		switcher->functionNamesByPriority[0] = (default_priority_0);
+		switcher->functionNamesByPriority[1] = (default_priority_1);
+		switcher->functionNamesByPriority[2] = (default_priority_2);
+		switcher->functionNamesByPriority[3] = (default_priority_3);
+		switcher->functionNamesByPriority[4] = (default_priority_4);
+		switcher->functionNamesByPriority[5] = (default_priority_5);
+		switcher->functionNamesByPriority[6] = (default_priority_6);
+		switcher->functionNamesByPriority[7] = (default_priority_7);
+		switcher->functionNamesByPriority[8] = (default_priority_8);
+		switcher->functionNamesByPriority[9] = (default_priority_9);
 	}
 
 	obs_data_set_default_int(obj, "threadPriority",
@@ -472,7 +565,8 @@ void SwitcherData::loadGeneralSettings(obs_data_t *obj)
 	obs_data_set_default_int(obj, "timeTabPos", 9);
 	obs_data_set_default_int(obj, "idleTabPos", 10);
 	obs_data_set_default_int(obj, "sequenceTabPos", 11);
-	obs_data_set_default_int(obj, "imageTabPos", 12);
+	obs_data_set_default_int(obj, "audioTabPos", 12);
+	obs_data_set_default_int(obj, "imageTabPos", 13);
 
 	switcher->tabOrder.emplace_back(
 		(int)(obs_data_get_int(obj, "generalTabPos")));
@@ -499,6 +593,8 @@ void SwitcherData::loadGeneralSettings(obs_data_t *obj)
 	switcher->tabOrder.emplace_back(
 		(int)(obs_data_get_int(obj, "sequenceTabPos")));
 	switcher->tabOrder.emplace_back(
+		(int)(obs_data_get_int(obj, "audioTabPos")));
+	switcher->tabOrder.emplace_back(
 		(int)(obs_data_get_int(obj, "imageTabPos")));
 }
 
@@ -506,6 +602,7 @@ void SceneSwitcher::setupGeneralTab()
 {
 	populateSceneSelection(ui->noMatchSwitchScene, false);
 	populateSceneSelection(ui->autoStopScenes, false);
+	populateSceneSelection(ui->autoStartScenes, false);
 
 	if (switcher->switchIfNotMatching == SWITCH) {
 		ui->noMatchSwitch->setChecked(true);
@@ -531,34 +628,54 @@ void SceneSwitcher::setupGeneralTab()
 		ui->autoStopScenes->setDisabled(true);
 	}
 
+	ui->autoStartType->addItem("Recording");
+	ui->autoStartType->addItem("Streaming");
+	ui->autoStartType->addItem("Recording and Streaming");
+
+	ui->autoStartSceneCheckBox->setChecked(switcher->autoStartEnable);
+	ui->autoStartScenes->setCurrentText(
+		GetWeakSourceName(switcher->autoStartScene).c_str());
+	ui->autoStartType->setCurrentIndex(switcher->autoStartType);
+
+	if (ui->autoStartSceneCheckBox->checkState()) {
+		ui->autoStartScenes->setDisabled(false);
+		ui->autoStartType->setDisabled(false);
+	} else {
+		ui->autoStartScenes->setDisabled(true);
+		ui->autoStartType->setDisabled(true);
+	}
+
 	ui->verboseLogging->setChecked(switcher->verbose);
 
 	for (int p : switcher->functionNamesByPriority) {
 		std::string s = "";
 		switch (p) {
-		case READ_FILE_FUNC:
+		case read_file_func:
 			s = "File Content";
 			break;
-		case ROUND_TRIP_FUNC:
+		case round_trip_func:
 			s = "Scene Sequence";
 			break;
-		case IDLE_FUNC:
+		case idle_func:
 			s = "Idle Detection";
 			break;
-		case EXE_FUNC:
+		case exe_func:
 			s = "Executable";
 			break;
-		case SCREEN_REGION_FUNC:
+		case screen_region_func:
 			s = "Screen Region";
 			break;
-		case WINDOW_TITLE_FUNC:
+		case window_title_func:
 			s = "Window Title";
 			break;
-		case MEDIA_FUNC:
+		case media_func:
 			s = "Media";
 			break;
-		case TIME_FUNC:
+		case time_func:
 			s = "Time";
+			break;
+		case audio_func:
+			s = "Audio";
 			break;
 		}
 		QString text(s.c_str());
@@ -567,7 +684,7 @@ void SceneSwitcher::setupGeneralTab()
 		item->setData(Qt::UserRole, text);
 	}
 
-	for (int i = 0; i < switcher->threadPriorities.size(); ++i) {
+	for (int i = 0; i < (int)switcher->threadPriorities.size(); ++i) {
 		ui->threadPriority->addItem(
 			switcher->threadPriorities[i].name.c_str());
 		ui->threadPriority->setItemData(

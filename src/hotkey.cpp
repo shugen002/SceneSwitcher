@@ -1,4 +1,6 @@
 #include <obs-module.h>
+#include <fstream>
+#include <regex>
 #include "headers/advanced-scene-switcher.hpp"
 
 void startHotkeyFunc(void *data, obs_hotkey_id id, obs_hotkey_t *hotkey,
@@ -17,7 +19,7 @@ void startHotkeyFunc(void *data, obs_hotkey_id id, obs_hotkey_t *hotkey,
 	if (hotkeyData != NULL) {
 		char *path = obs_module_config_path("");
 		std::ofstream file;
-		file.open(std::string(path).append(START_HOTKEY_PATH),
+		file.open(std::string(path).append(start_hotkey_path),
 			  std::ofstream::trunc);
 		if (file.is_open()) {
 			size_t num = obs_data_array_count(hotkeyData);
@@ -51,7 +53,7 @@ void stopHotkeyFunc(void *data, obs_hotkey_id id, obs_hotkey_t *hotkey,
 	if (hotkeyData != NULL) {
 		char *path = obs_module_config_path("");
 		std::ofstream file;
-		file.open(std::string(path).append(STOP_HOTKEY_PATH),
+		file.open(std::string(path).append(stop_hotkey_path),
 			  std::ofstream::trunc);
 		if (file.is_open()) {
 			size_t num = obs_data_array_count(hotkeyData);
@@ -87,7 +89,7 @@ void startStopToggleHotkeyFunc(void *data, obs_hotkey_id id,
 	if (hotkeyData != NULL) {
 		char *path = obs_module_config_path("");
 		std::ofstream file;
-		file.open(std::string(path).append(TOGGLE_HOTKEY_PATH),
+		file.open(std::string(path).append(toggle_hotkey_path),
 			  std::ofstream::trunc);
 		if (file.is_open()) {
 			size_t num = obs_data_array_count(hotkeyData);

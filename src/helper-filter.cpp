@@ -4,8 +4,6 @@
 
 #define INVERVAL_S "interval"
 
-
-
 static const char *helper_filter_name(void *unused)
 {
 	UNUSED_PARAMETER(unused);
@@ -82,7 +80,6 @@ static void helper_filter_render(void *data, gs_effect_t *effect)
 {
 	struct frameData *filter_data = (frameData *)data;
 
-
 	// do nothing
 	gs_effect_t *default_effect = obs_get_base_effect(OBS_EFFECT_DEFAULT);
 	if (!obs_source_process_filter_begin(filter_data->context, GS_RGBA,
@@ -94,13 +91,15 @@ static void helper_filter_render(void *data, gs_effect_t *effect)
 		gs_texture_destroy(filter_data->tex);
 
 		// probably need to switch to staging surface
-		filter_data->tex = gs_texture_create(
-			gs_texture_get_width(cur_tex),
-			gs_texture_get_height(cur_tex), GS_RGBA, 1,
-			nullptr, GS_DYNAMIC);
+		filter_data->tex =
+			gs_texture_create(gs_texture_get_width(cur_tex),
+					  gs_texture_get_height(cur_tex),
+					  GS_RGBA, 1, nullptr, GS_DYNAMIC);
 		gs_copy_texture(filter_data->tex, cur_tex);
 
-		gs_stagesurf_t* stage = gs_stagesurface_create(gs_texture_get_width(cur_tex), gs_texture_get_height(cur_tex), GS_RGBA);
+		gs_stagesurf_t *stage = gs_stagesurface_create(
+			gs_texture_get_width(cur_tex),
+			gs_texture_get_height(cur_tex), GS_RGBA);
 		gs_stage_texture(stage, cur_tex);
 
 		// testing
