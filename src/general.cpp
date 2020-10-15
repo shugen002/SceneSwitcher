@@ -7,7 +7,7 @@
 
 QMetaObject::Connection inactivePluse;
 
-void SceneSwitcher::on_close_clicked()
+void SceneSwitcher::on_closePlugin_clicked()
 {
 	done(0);
 }

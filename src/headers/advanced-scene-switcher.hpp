@@ -198,7 +198,7 @@ public slots:
 
 	void updateScreenRegionCursorPos();
 
-	void on_close_clicked();
+	void on_closePlugin_clicked();
 
 private:
 };

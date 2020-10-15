@@ -587,7 +587,7 @@
         </layout>
        </item>
        <item>
-        <widget class="QPushButton" name="close">
+        <widget class="QPushButton" name="closePlugin">
          <property name="text">
           <string>Close</string>
          </property>
