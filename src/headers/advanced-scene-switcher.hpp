@@ -80,12 +80,12 @@ public slots:
 	void on_add_clicked();
 	void on_remove_clicked();
 	void on_noMatchDontSwitch_clicked();
-	void on_noMatchSwitch_clicked();
+	void on_noMatchSwitchScene_clicked();
 	void on_noMatchRandomSwitch_clicked();
 	void on_startupBehavior_currentIndexChanged(int index);
-	void on_noMatchSwitchScene_currentTextChanged(const QString &text);
-	void on_checkInterval_valueChanged(int value);
-	void on_toggleStartButton_clicked();
+	void on_noMatchScene_currentTextChanged(const QString &text);
+	void on_interval_valueChanged(int value);
+	void on_toggleStart_clicked();
 	void on_tabMoved(int from, int to);
 
 	void on_screenRegions_currentRowChanged(int idx);

@@ -28,18 +28,18 @@ void SceneSwitcher::on_noMatchDontSwitch_clicked()
 
 	std::lock_guard<std::mutex> lock(switcher->m);
 	switcher->switchIfNotMatching = NO_SWITCH;
-	ui->noMatchSwitchScene->setEnabled(false);
+	ui->noMatchScene->setEnabled(false);
 }
 
-void SceneSwitcher::on_noMatchSwitch_clicked()
+void SceneSwitcher::on_noMatchSwitchScene_clicked()
 {
 	if (loading)
 		return;
 
 	std::lock_guard<std::mutex> lock(switcher->m);
 	switcher->switchIfNotMatching = SWITCH;
-	ui->noMatchSwitchScene->setEnabled(true);
-	UpdateNonMatchingScene(ui->noMatchSwitchScene->currentText());
+	ui->noMatchScene->setEnabled(true);
+	UpdateNonMatchingScene(ui->noMatchScene->currentText());
 }
 
 void SceneSwitcher::on_noMatchRandomSwitch_clicked()
@@ -49,7 +49,7 @@ void SceneSwitcher::on_noMatchRandomSwitch_clicked()
 
 	std::lock_guard<std::mutex> lock(switcher->m);
 	switcher->switchIfNotMatching = RANDOM_SWITCH;
-	ui->noMatchSwitchScene->setEnabled(false);
+	ui->noMatchScene->setEnabled(false);
 }
 
 void SceneSwitcher::on_startupBehavior_currentIndexChanged(int index)
@@ -61,7 +61,7 @@ void SceneSwitcher::on_startupBehavior_currentIndexChanged(int index)
 	switcher->startupBehavior = (StartupBehavior)index;
 }
 
-void SceneSwitcher::on_noMatchSwitchScene_currentTextChanged(const QString &text)
+void SceneSwitcher::on_noMatchScene_currentTextChanged(const QString &text)
 {
 	if (loading)
 		return;
@@ -70,7 +70,7 @@ void SceneSwitcher::on_noMatchSwitchScene_currentTextChanged(const QString &text
 	UpdateNonMatchingScene(text);
 }
 
-void SceneSwitcher::on_checkInterval_valueChanged(int value)
+void SceneSwitcher::on_interval_valueChanged(int value)
 {
 	if (loading)
 		return;
@@ -81,17 +81,17 @@ void SceneSwitcher::on_checkInterval_valueChanged(int value)
 
 void SceneSwitcher::SetStarted()
 {
-	ui->toggleStartButton->setText("Stop");
-	ui->pluginRunningText->setText("Active");
+	ui->toggleStart->setText("Stop");
+	ui->pluginState->setText("Active");
 }
 
 void SceneSwitcher::SetStopped()
 {
-	ui->toggleStartButton->setText("Start");
-	ui->pluginRunningText->setText("Inactive");
+	ui->toggleStart->setText("Start");
+	ui->pluginState->setText("Inactive");
 }
 
-void SceneSwitcher::on_toggleStartButton_clicked()
+void SceneSwitcher::on_toggleStart_clicked()
 {
 	if (switcher->th && switcher->th->isRunning()) {
 		switcher->Stop();
@@ -592,23 +592,23 @@ void SwitcherData::loadGeneralSettings(obs_data_t *obj)
 
 void SceneSwitcher::setupGeneralTab()
 {
-	populateSceneSelection(ui->noMatchSwitchScene, false);
+	populateSceneSelection(ui->noMatchScene, false);
 	populateSceneSelection(ui->autoStopScenes, false);
 	populateSceneSelection(ui->autoStartScenes, false);
 
 	if (switcher->switchIfNotMatching == SWITCH) {
-		ui->noMatchSwitch->setChecked(true);
-		ui->noMatchSwitchScene->setEnabled(true);
+		ui->noMatchSwitchScene->setChecked(true);
+		ui->noMatchScene->setEnabled(true);
 	} else if (switcher->switchIfNotMatching == NO_SWITCH) {
 		ui->noMatchDontSwitch->setChecked(true);
-		ui->noMatchSwitchScene->setEnabled(false);
+		ui->noMatchScene->setEnabled(false);
 	} else {
 		ui->noMatchRandomSwitch->setChecked(true);
-		ui->noMatchSwitchScene->setEnabled(false);
+		ui->noMatchScene->setEnabled(false);
 	}
-	ui->noMatchSwitchScene->setCurrentText(
+	ui->noMatchScene->setCurrentText(
 		GetWeakSourceName(switcher->nonMatchingScene).c_str());
-	ui->checkInterval->setValue(switcher->interval);
+	ui->interval->setValue(switcher->interval);
 
 	ui->autoStopSceneCheckBox->setChecked(switcher->autoStopEnable);
 	ui->autoStopScenes->setCurrentText(

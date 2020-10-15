@@ -239,7 +239,7 @@ void SwitcherData::Thread()
 				break;
 			case round_trip_func:
 				checkSceneSequence(match, scene, transition,
-						    lock);
+						   lock);
 				if (sceneChangedDuringWait()) //scene might have changed during the sleep
 				{
 					goto startLoop;
