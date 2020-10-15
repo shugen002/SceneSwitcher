@@ -2,6 +2,7 @@
 #include <condition_variable>
 #include <string>
 #include <vector>
+#include <deque>
 #include <mutex>
 #include <QDateTime>
 #include <QThread>
@@ -45,6 +46,7 @@ struct SwitcherData {
 	std::condition_variable transitionCv;
 	bool stop = false;
 	bool verbose = false;
+	bool disableHints = false;
 	bool tansitionOverrideOverride = false;
 
 	int interval = default_interval;
@@ -57,7 +59,7 @@ struct SwitcherData {
 	NoMatch switchIfNotMatching = NO_SWITCH;
 	StartupBehavior startupBehavior = PERSIST;
 
-	std::vector<WindowSceneSwitch> windowSwitches;
+	std::deque<WindowSwitch> windowSwitches;
 	std::vector<std::string> ignoreIdleWindows;
 	std::string lastTitle;
 
@@ -72,14 +74,14 @@ struct SwitcherData {
 	std::vector<SceneSequenceSwitch> sceneSequenceSwitches;
 	int sceneSequenceMultiplier = 1;
 
-	std::vector<RandomSwitch> randomSwitches;
+	std::deque<RandomSwitch> randomSwitches;
 
 	FileIOData fileIO;
 	IdleData idleData;
 	std::vector<FileSwitch> fileSwitches;
 	CURL *curl = nullptr;
 
-	std::vector<ExecutableSceneSwitch> executableSwitches;
+	std::deque<ExecutableSwitch> executableSwitches;
 
 	bool autoStopEnable = false;
 	OBSWeakSource autoStopScene;
@@ -92,12 +94,12 @@ struct SwitcherData {
 	std::vector<SceneTransition> sceneTransitions;
 	std::vector<DefaultSceneTransition> defaultSceneTransitions;
 
-	std::vector<MediaSwitch> mediaSwitches;
+	std::deque<MediaSwitch> mediaSwitches;
 
-	std::vector<TimeSwitch> timeSwitches;
+	std::deque<TimeSwitch> timeSwitches;
 	QDateTime liveTime;
 
-	std::vector<AudioSwitch> audioSwitches;
+	std::deque<AudioSwitch> audioSwitches;
 
 	std::vector<int> functionNamesByPriority = std::vector<int>{
 		default_priority_0, default_priority_1, default_priority_2,
@@ -150,8 +152,8 @@ struct SwitcherData {
 	void autoStartStreamRecording();
 	bool checkPause();
 	void checkSceneSequence(bool &match, OBSWeakSource &scene,
-				 OBSWeakSource &transition,
-				 std::unique_lock<std::mutex> &lock);
+				OBSWeakSource &transition,
+				std::unique_lock<std::mutex> &lock);
 	void checkIdleSwitch(bool &match, OBSWeakSource &scene,
 			     OBSWeakSource &transition);
 	void checkWindowTitleSwitch(bool &match, OBSWeakSource &scene,

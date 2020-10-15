@@ -12,6 +12,8 @@
 #include "switcher-data-structs.hpp"
 #include "volume-control.hpp"
 
+#define blog(level, msg, ...) blog(level, "[adv-ss] " msg, ##__VA_ARGS__)
+
 class QCloseEvent;
 
 /*******************************************************************************
@@ -22,7 +24,6 @@ class SceneSwitcher : public QDialog {
 
 public:
 	std::unique_ptr<Ui_SceneSwitcher> ui;
-	VolControl *volMeter = nullptr;
 	bool loading = true;
 
 	SceneSwitcher(QWidget *parent);
@@ -32,7 +33,6 @@ public:
 	void SetStarted();
 	void SetStopped();
 
-	int FindByData(const QString &window);
 	int ScreenRegionFindByData(const QString &region);
 	int PauseScenesFindByData(const QString &scene);
 	int PauseWindowsFindByData(const QString &window);
@@ -41,23 +41,15 @@ public:
 	int SceneTransitionsFindByData(const QString &scene1,
 				       const QString &scene2);
 	int DefaultTransitionsFindByData(const QString &scene);
-	int executableFindByData(const QString &exe);
 	int IgnoreIdleWindowsFindByData(const QString &window);
-	int randomFindByData(const QString &scene);
-	int timeFindByData(const timeTrigger &trigger, const QTime &time);
-	int audioFindByData(const QString &source, const int &volume);
 
 	void UpdateNonMatchingScene(const QString &name);
 	void UpdateAutoStopScene(const QString &name);
 	void UpdateAutoStartScene(const QString &name);
 	void UpdateIdleDataTransition(const QString &name);
 	void UpdateIdleDataScene(const QString &name);
-	void SetAudioVolumeMeter(const QString &name);
 
 	void loadUI();
-	void populateSceneSelection(QComboBox *sel, bool addPrevious);
-	void populateTransitionSelection(QComboBox *sel);
-	void populateWindowSelection(QComboBox *sel);
 	void setupGeneralTab();
 	void setupTitleTab();
 	void setupExecutableTab();
@@ -73,12 +65,31 @@ public:
 	void setupAudioTab();
 	void setTabOrder();
 
+	static void populateSceneSelection(QComboBox *sel,
+					   bool addPrevious = false,
+					   bool addSelect = true);
+	static void populateTransitionSelection(QComboBox *sel,
+						bool addSelect = true);
+	static void populateWindowSelection(QComboBox *sel,
+					    bool addSelect = true);
+	static void populateAudioSelection(QComboBox *sel,
+					   bool addSelect = true);
+	static void populateMediaSelection(QComboBox *sel,
+					   bool addSelect = true);
+	static void populateProcessSelection(QComboBox *sel,
+					     bool addSelect = true);
+	QMetaObject::Connection PulseWidget(QWidget *widget, QColor endColor,
+					    QColor = QColor(0, 0, 0, 0),
+					    QString specifier = "");
+
+	bool listMoveUp(QListWidget *list);
+	bool listMoveDown(QListWidget *list);
+
 public slots:
-	void on_switches_currentRowChanged(int idx);
-	void on_up_clicked();
-	void on_down_clicked();
-	void on_add_clicked();
-	void on_remove_clicked();
+	void on_windowUp_clicked();
+	void on_windowDown_clicked();
+	void on_windowAdd_clicked();
+	void on_windowRemove_clicked();
 	void on_noMatchDontSwitch_clicked();
 	void on_noMatchSwitchScene_clicked();
 	void on_noMatchRandomSwitch_clicked();
@@ -123,6 +134,7 @@ public slots:
 	void on_autoStartScenes_currentTextChanged(const QString &text);
 
 	void on_verboseLogging_stateChanged(int state);
+	void on_uiHintsDisable_stateChanged(int state);
 
 	void on_exportSettings_clicked();
 	void on_importSettings_clicked();
@@ -146,7 +158,6 @@ public slots:
 	void on_executableDown_clicked();
 	void on_executableAdd_clicked();
 	void on_executableRemove_clicked();
-	void on_executables_currentRowChanged(int idx);
 
 	void on_idleCheckBox_stateChanged(int state);
 	void on_idleTransitions_currentTextChanged(const QString &text);
@@ -158,7 +169,6 @@ public slots:
 
 	void on_randomAdd_clicked();
 	void on_randomRemove_clicked();
-	void on_randomScenesList_currentRowChanged(int idx);
 
 	void on_fileAdd_clicked();
 	void on_fileRemove_clicked();
@@ -167,14 +177,11 @@ public slots:
 	void on_fileUp_clicked();
 	void on_fileDown_clicked();
 
-	void on_mediaSwitches_currentRowChanged(int idx);
 	void on_mediaAdd_clicked();
 	void on_mediaRemove_clicked();
 	void on_mediaUp_clicked();
 	void on_mediaDown_clicked();
-	void on_mediaTimeRestrictions_currentIndexChanged(int idx);
 
-	void on_timeSwitches_currentRowChanged(int idx);
 	void on_timeAdd_clicked();
 	void on_timeRemove_clicked();
 	void on_timeUp_clicked();
@@ -184,8 +191,6 @@ public slots:
 	void on_audioRemove_clicked();
 	void on_audioUp_clicked();
 	void on_audioDown_clicked();
-	void on_audioSwitches_currentRowChanged(int idx);
-	void on_audioSources_currentTextChanged(const QString &text);
 
 	void on_priorityUp_clicked();
 	void on_priorityDown_clicked();

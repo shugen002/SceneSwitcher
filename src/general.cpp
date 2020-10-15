@@ -5,6 +5,8 @@
 
 #include "headers/advanced-scene-switcher.hpp"
 
+QMetaObject::Connection inactivePluse;
+
 void SceneSwitcher::on_close_clicked()
 {
 	done(0);
@@ -29,6 +31,8 @@ void SceneSwitcher::on_noMatchDontSwitch_clicked()
 	std::lock_guard<std::mutex> lock(switcher->m);
 	switcher->switchIfNotMatching = NO_SWITCH;
 	ui->noMatchScene->setEnabled(false);
+	ui->randomDisabledWarning->setVisible(true);
+
 }
 
 void SceneSwitcher::on_noMatchSwitchScene_clicked()
@@ -40,6 +44,7 @@ void SceneSwitcher::on_noMatchSwitchScene_clicked()
 	switcher->switchIfNotMatching = SWITCH;
 	ui->noMatchScene->setEnabled(true);
 	UpdateNonMatchingScene(ui->noMatchScene->currentText());
+	ui->randomDisabledWarning->setVisible(true);
 }
 
 void SceneSwitcher::on_noMatchRandomSwitch_clicked()
@@ -49,7 +54,8 @@ void SceneSwitcher::on_noMatchRandomSwitch_clicked()
 
 	std::lock_guard<std::mutex> lock(switcher->m);
 	switcher->switchIfNotMatching = RANDOM_SWITCH;
-	ui->noMatchScene->setEnabled(false);
+ui->noMatchScene->setEnabled(false);
+	ui->randomDisabledWarning->setVisible(false);
 }
 
 void SceneSwitcher::on_startupBehavior_currentIndexChanged(int index)
@@ -81,14 +87,18 @@ void SceneSwitcher::on_interval_valueChanged(int value)
 
 void SceneSwitcher::SetStarted()
 {
-	ui->toggleStart->setText("Stop");
+ ui->toggleStart->setText("Stop");
 	ui->pluginState->setText("Active");
+ui->pluginState->disconnect(inactivePluse);
+
 }
 
 void SceneSwitcher::SetStopped()
 {
-	ui->toggleStart->setText("Start");
+ui->toggleStart->setText("Start");
 	ui->pluginState->setText("Inactive");
+	inactivePluse = PulseWidget(ui->pluginState, QColor(Qt::red),
+				    QColor(0, 0, 0, 0), "QLabel ");
 }
 
 void SceneSwitcher::on_toggleStart_clicked()
@@ -235,9 +245,14 @@ void SceneSwitcher::on_verboseLogging_stateChanged(int state)
 {
 	if (loading)
 		return;
-
-	std::lock_guard<std::mutex> lock(switcher->m);
 	switcher->verbose = state;
+}
+
+void SceneSwitcher::on_uiHintsDisable_stateChanged(int state)
+{
+	if (loading)
+		return;
+	switcher->disableHints = state;
 }
 
 void SceneSwitcher::on_exportSettings_clicked()
@@ -378,7 +393,7 @@ int findTabIndex(QTabBar *bar, int pos)
 		}
 	}
 	if (at == -1)
-		blog(LOG_INFO, "Advanced Scene Switcher failed to find tab %s",
+		blog(LOG_INFO, "failed to find tab %s",
 		     tabName.toUtf8().constData());
 
 	return at;
@@ -432,6 +447,7 @@ void SwitcherData::saveGeneralSettings(obs_data_t *obj)
 			    autoStartSceneName.c_str());
 
 	obs_data_set_bool(obj, "verbose", switcher->verbose);
+	obs_data_set_bool(obj, "disableHints", switcher->disableHints);
 
 	obs_data_set_int(obj, "priority0",
 			 switcher->functionNamesByPriority[0]);
@@ -503,6 +519,7 @@ void SwitcherData::loadGeneralSettings(obs_data_t *obj)
 	switcher->autoStartScene = GetWeakSourceByName(autoStartScene.c_str());
 
 	switcher->verbose = obs_data_get_bool(obj, "verbose");
+	switcher->disableHints = obs_data_get_bool(obj, "disableHints");
 
 	obs_data_set_default_int(obj, "priority0", default_priority_0);
 	obs_data_set_default_int(obj, "priority1", default_priority_1);
@@ -638,6 +655,7 @@ void SceneSwitcher::setupGeneralTab()
 	}
 
 	ui->verboseLogging->setChecked(switcher->verbose);
+	ui->uiHintsDisable->setChecked(switcher->disableHints);
 
 	for (int p : switcher->functionNamesByPriority) {
 		std::string s = "";
