@@ -143,9 +143,10 @@ void AdvSceneSwitcher::on_defaultTransitionsDown_clicked()
 		  switcher->defaultSceneTransitions[index + 1]);
 }
 
-void SwitcherData::setDefaultSceneTransitions()
+void SwitcherData::checkDefaultSceneTransitions(bool &match,
+						OBSWeakSource &transition)
 {
-	if (changedDefTransitionRecently)
+	if (checkedDefTransition)
 		return;
 
 	obs_source_t *currentSource = obs_frontend_get_current_scene();
@@ -156,22 +157,25 @@ void SwitcherData::setDefaultSceneTransitions()
 			if (!s.initialized())
 				continue;
 
-			obs_source_t *transition =
-				obs_weak_source_get_source(s.transition);
-			//This might cancel the current transition
-			//There is no way to be sure when the previous transition finished
-			obs_frontend_set_current_transition(transition);
+			match = true;
+			transition = s.transition;
 
 			if (verbose)
 				s.logMatch();
-
-			obs_source_release(transition);
 			break;
 		}
 	}
 	obs_source_release(currentSource);
 	obs_weak_source_release(ws);
-	changedDefTransitionRecently = true;
+
+	checkedDefTransition = true;
+}
+
+void SwitcherData::setCurrentDefTransition(OBSWeakSource &transition)
+{
+	obs_source_t *transitionSource = obs_weak_source_get_source(transition);
+	obs_frontend_set_current_transition(transitionSource);
+	obs_source_release(transitionSource);
 }
 
 void AdvSceneSwitcher::on_transitionOverridecheckBox_stateChanged(int state)
@@ -414,10 +418,6 @@ TransitionSwitchWidget::TransitionSwitchWidget(SceneTransition *s)
 {
 	scenes2 = new QComboBox();
 
-	switchLabel = new QLabel("Switch from scene");
-	toLabel = new QLabel("to scene");
-	usingLabel = new QLabel("using transition");
-
 	QWidget::connect(scenes2, SIGNAL(currentTextChanged(const QString &)),
 			 this, SLOT(Scene2Changed(const QString &)));
 
@@ -430,15 +430,12 @@ TransitionSwitchWidget::TransitionSwitchWidget(SceneTransition *s)
 	setStyleSheet("* { background-color: transparent; }");
 
 	QHBoxLayout *mainLayout = new QHBoxLayout;
-
-	mainLayout->addWidget(switchLabel);
-	mainLayout->addWidget(scenes);
-	mainLayout->addWidget(toLabel);
-	mainLayout->addWidget(scenes2);
-	mainLayout->addWidget(usingLabel);
-	mainLayout->addWidget(transitions);
-	mainLayout->addStretch();
-
+	std::unordered_map<std::string, QWidget *> widgetPlaceholders = {
+		{"{{scenes}}", scenes},
+		{"{{scenes2}}", scenes2},
+		{"{{transitions}}", transitions}};
+	placeWidgets(obs_module_text("AdvSceneSwitcher.transitionTab.entry"),
+		     mainLayout, widgetPlaceholders);
 	setLayout(mainLayout);
 
 	switchData = s;
@@ -477,20 +474,15 @@ void TransitionSwitchWidget::Scene2Changed(const QString &text)
 DefTransitionSwitchWidget::DefTransitionSwitchWidget(DefaultSceneTransition *s)
 	: SwitchWidget(s, false)
 {
-	whenLabel = new QLabel("When scene");
-	switchLabel =
-		new QLabel("is active change default scene transition to ");
-
 	setStyleSheet("* { background-color: transparent; }");
 
 	QHBoxLayout *mainLayout = new QHBoxLayout;
-
-	mainLayout->addWidget(whenLabel);
-	mainLayout->addWidget(scenes);
-	mainLayout->addWidget(switchLabel);
-	mainLayout->addWidget(transitions);
-	mainLayout->addStretch();
-
+	std::unordered_map<std::string, QWidget *> widgetPlaceholders = {
+		{"{{scenes}}", scenes}, {"{{transitions}}", transitions}};
+	placeWidgets(
+		obs_module_text(
+			"AdvSceneSwitcher.transitionTab.defaultTransitionEntry"),
+		mainLayout, widgetPlaceholders);
 	setLayout(mainLayout);
 
 	switchData = s;

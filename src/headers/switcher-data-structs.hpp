@@ -63,6 +63,8 @@ struct SwitcherData {
 	OBSWeakSource lastRandomScene;
 	OBSWeakSource nonMatchingScene;
 	NoMatch switchIfNotMatching = NO_SWITCH;
+	double noMatchDelay;
+	double noMatchCount = 0;
 	StartupBehavior startupBehavior = PERSIST;
 
 	std::deque<WindowSwitch> windowSwitches;
@@ -84,7 +86,7 @@ struct SwitcherData {
 	IdleData idleData;
 
 	FileIOData fileIO;
-	std::vector<FileSwitch> fileSwitches;
+	std::deque<FileSwitch> fileSwitches;
 	CURL *curl = nullptr;
 
 	std::deque<ExecutableSwitch> executableSwitches;
@@ -99,7 +101,7 @@ struct SwitcherData {
 
 	std::deque<SceneTransition> sceneTransitions;
 	std::deque<DefaultSceneTransition> defaultSceneTransitions;
-	bool changedDefTransitionRecently = false;
+	bool checkedDefTransition = false;
 
 	std::deque<MediaSwitch> mediaSwitches;
 
@@ -154,10 +156,13 @@ struct SwitcherData {
 	bool sceneChangedDuringWait();
 	bool prioFuncsValid();
 	void writeSceneInfoToFile();
-	void setDefaultSceneTransitions();
+	void writeToStatusFile(QString status);
 	void autoStopStreamAndRecording();
 	void autoStartStreamRecording();
 	bool checkPause();
+	void checkDefaultSceneTransitions(bool &match,
+					  OBSWeakSource &transition);
+	void setCurrentDefTransition(OBSWeakSource &transition);
 	void checkSceneSequence(bool &match, OBSWeakSource &scene,
 				OBSWeakSource &transition,
 				std::unique_lock<std::mutex> &lock);
@@ -181,6 +186,8 @@ struct SwitcherData {
 			     OBSWeakSource &transition);
 	void checkAudioSwitch(bool &match, OBSWeakSource &scene,
 			      OBSWeakSource &transition);
+	void checkNoMatchSwitch(bool &match, OBSWeakSource &scene,
+				OBSWeakSource &transition, int &sleep);
 
 	void saveWindowTitleSwitches(obs_data_t *obj);
 	void saveScreenRegionSwitches(obs_data_t *obj);
@@ -213,6 +220,7 @@ struct SwitcherData {
 	void loadHotkeys(obs_data_t *obj);
 
 	void Prune();
+
 	inline ~SwitcherData() { Stop(); }
 };
 

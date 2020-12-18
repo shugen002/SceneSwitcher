@@ -28,6 +28,8 @@ struct MediaSwitch : SceneSwitcherEntry {
 	// workaround to enable use of "ended" to specify end of VLC playlist
 	bool previousStateEnded = false;
 
+	bool playedToEnd = false;
+
 	const char *getType() { return "media"; }
 	bool initialized();
 	bool valid();
@@ -72,12 +74,6 @@ private:
 	QComboBox *states;
 	QComboBox *timeRestrictions;
 	QSpinBox *time;
-
-	QLabel *whenLabel;
-	QLabel *stateLabel;
-	QLabel *andLabel;
-	QLabel *switchLabel;
-	QLabel *usingLabel;
 
 	MediaSwitch *switchData;
 };
